@@ -5,6 +5,46 @@
  * @format
  */
 
+
+import { StyleSheet, Text, View, Image, Button, TouchableOpacity, Alert, Pressable, SafeAreaView, useColorScheme, ScrollView, TextInput } from 'react-native'
+import React from 'react'
+
+// 1:34:00
+
+
+const App = () => {
+
+  // const [text, setText] = useState('')
+
+  const style = {
+    container:{
+      width: '100%',
+      height: '100%',
+      backgroundColor:"red",
+    }
+  }
+
+  return(
+    <SafeAreaView
+    style = {{
+      flex:1,
+      justifyContent:"center", // vertical
+      alignItems: "center" //horizontal
+    }} 
+    >
+      <Text 
+      
+      >Hello IJ Roy this app is for version 1.0.0</Text>
+    </SafeAreaView>
+  )
+
+}
+
+export default App
+
+
+
+/*
 import React from 'react';
 import type {PropsWithChildren} from 'react';
 import {
@@ -116,3 +156,4 @@ const styles = StyleSheet.create({
 });
 
 export default App;
+*/
