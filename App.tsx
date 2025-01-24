@@ -6,15 +6,70 @@
  */
 
 
-import { StyleSheet, Text, View, Image, Button, TouchableOpacity, Alert, Pressable, SafeAreaView, useColorScheme, ScrollView, TextInput } from 'react-native'
-import React from 'react'
 
 // 1:34:00
+
+import {
+  StyleSheet,
+  Text,
+  View,
+  SafeAreaView,
+} from 'react-native';
+import React, { useEffect } from 'react';
+import SplashScreen from 'react-native-splash-screen';
+
+const App = () => {
+
+
+  // useEffect(() => {
+  //   // Hide the splash screen after the app has loaded
+  //   SplashScreen.hide();
+  // }, []);
+  
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>Hello IJ Roy, this app is for version 1.0.2</Text>
+      <Text style={styles.subtitle}>Splash Screen is done in this version</Text>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center', // vertical alignment
+    alignItems: 'center', // horizontal alignment
+    backgroundColor: '#ffffff', // Set the background color to red
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'black',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: 'black',
+    marginTop: 10,
+  },
+});
+
+export default App;
+
+
+/*
+
+import { StyleSheet, Text, View, Image, Button, TouchableOpacity, Alert, Pressable, SafeAreaView, useColorScheme, ScrollView, TextInput } from 'react-native'
+import React, { useEffect } from 'react';
+import SplashScreen from 'react-native-splash-screen';
 
 
 const App = () => {
 
   // const [text, setText] = useState('')
+  useEffect(() => {
+    SplashScreen.hide(); // Hide the splash screen after the app has loaded
+     }, []);
 
   const style = {
     container:{
@@ -32,9 +87,8 @@ const App = () => {
       alignItems: "center" //horizontal
     }} 
     >
-      <Text 
-      
-      >Hello IJ Roy this app is for version 1.0.0</Text>
+      <Text>Hello IJ Roy this app is for version 1.0.0</Text>
+      <Text>My task is to make the splash screen</Text>
     </SafeAreaView>
   )
 
@@ -42,7 +96,7 @@ const App = () => {
 
 export default App
 
-
+*/
 
 /*
 import React from 'react';
