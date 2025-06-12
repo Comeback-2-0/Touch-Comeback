@@ -9,52 +9,25 @@
 
 // 1:34:00
 
-import {
-  StyleSheet,
-  Text,
-  View,
-  SafeAreaView,
-} from 'react-native';
-import React, { useEffect } from 'react';
-import SplashScreen from 'react-native-splash-screen';
-
-const App = () => {
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
 
 
-  // useEffect(() => {
-  //   // Hide the splash screen after the app has loaded
-  //   SplashScreen.hide();
-  // }, []);
-  
+import MainNavigator from './app/src/navigation/Navigation';
+// If you're not using ChatNavigation right now, you can safely comment/remove this line
+// import AppNavigator from './src/navigation/ChatNavigation';
 
+const App: React.FC = () => {
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Hello IJ Roy, this app is for version 1.0.2</Text>
-      <Text style={styles.subtitle}>Splash Screen is done in this version</Text>
-    </SafeAreaView>
+    <NavigationContainer>
+      <MainNavigator />
+    </NavigationContainer>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center', // vertical alignment
-    alignItems: 'center', // horizontal alignment
-    backgroundColor: '#ffffff', // Set the background color to red
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'black',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: 'black',
-    marginTop: 10,
-  },
-});
-
 export default App;
+
+
 
 
 /*
