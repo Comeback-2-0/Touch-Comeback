@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "160562514921",
+    "project_id": "touch-social-media-app",
+    "storage_bucket": "touch-social-media-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160562514921:android:0fd13c09bdd184e3fa1978",
+        "android_client_info": {
+          "package_name": "roy.ij.touch"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "160562514921-3rbdplsjv3b4t16slt38jsvp2h0c5fkc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "roy.ij.touch",
+            "certificate_hash": "5d51452f1dbb8e3ca24ec60dbdb9a4d92eff911d"
+          }
+        },
+        {
+          "client_id": "160562514921-k0d8ohhtijm8rmc0v4j4pulqnreu7qbc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "roy.ij.touch",
+            "certificate_hash": "a38678a4c8a26606e493c15dbf02886e5e85e213"
+          }
+        },
+        {
+          "client_id": "160562514921-khteeq9bfjvc0fuqufr60et1sqeebs67.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "roy.ij.touch",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "160562514921-n7apc9k12tliqgni4ri10k5901qpvpmr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5E64kOgHQi0aR3LNvPByONmCCTRTfPow"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "160562514921-n7apc9k12tliqgni4ri10k5901qpvpmr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
