@@ -7,6 +7,8 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
 } from '@react-native-firebase/auth';
+import axios from 'axios';
+import { API_URL } from '../utils/api';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
@@ -32,15 +34,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, []);
 
-  const signInWithGoogle = async () => {
+const signInWithGoogle = async () => {
+  try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    await GoogleSignin.signIn();
+
+    const userInfo = await GoogleSignin.signIn();
     const { idToken } = await GoogleSignin.getTokens();
+
     if (!idToken) throw new Error('No idToken returned from Google Sign-In');
 
     const credential = GoogleAuthProvider.credential(idToken);
     await signInWithCredential(auth, credential);
-  };
+
+    // Send idToken to backend
+    const response = await axios.post(`${API_URL}/auth/google`, { idToken });
+
+    console.log('✅ Sent token to backend:', response.data);
+    // You can now use: response.data.user to store user in context if needed
+
+  } catch (error) {
+    console.error('Google Sign-In Error:', error);
+  }
+};
+
 
   const signOut = async () => {
     await firebaseSignOut(auth);
