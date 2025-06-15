@@ -13,7 +13,6 @@ export default function AuthScreen() {
   const handleLogin = async () => {
     try {
       await signInWithGoogle();
-      navigation.replace('Home');
     } catch (err) {
       console.error('Google Sign-In Error:', err);
     }

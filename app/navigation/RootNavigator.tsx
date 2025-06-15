@@ -6,7 +6,7 @@ import AppStack from './AppStack';
 
 export type RootStackParamList = {
   Auth: undefined;
-  Home: undefined;
+  Main: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -19,7 +19,7 @@ export default function RootNavigator() {
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
-        <RootStack.Screen name="Home" component={AppStack} />
+        <RootStack.Screen name="Main" component={AppStack} />
       ) : (
         <RootStack.Screen name="Auth" component={AuthStack} />
       )}
