@@ -22,7 +22,7 @@ const MoodReel = ({ mood }: { mood: Mood }) => {
       data={mood.reels}
       keyExtractor={(item) => item.id}
       renderItem={({ item, index }) => (
-        <ReelCard uri={item.uri} isActive={index === activeReelIndex} />
+        <ReelCard uri={item.uri} isActive={index === activeReelIndex} id={''} reelId={''} />
       )}
       pagingEnabled
       showsVerticalScrollIndicator={false}
