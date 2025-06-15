@@ -1,3 +1,14 @@
 {
-  "extends": "@react-native/typescript-config/tsconfig.json"
+  "extends": "@react-native/typescript-config/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-native",  // Override or add extra settings
+    "strict": true,
+    "baseUrl": "app/src",
+    "paths": {
+      "@icons/*": ["assets/icons/*"],
+    },
+    "types": ["react-native", "jest"]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
 }
