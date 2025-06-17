@@ -1,12 +1,13 @@
-
+// app/navigation/CommunityStack.tsx
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Communities from '../screens/CommunitiesTab';
 import ChatRoom from '../screens/ChatRooms';
+import type { Community } from '../navigation/types/community';
 
 export type CommunitiesStackParamList = {
   CommunitiesTabScreen: undefined;
-  ChatRoom: { community: any }; 
+  ChatRoom: { community: Community };
 };
 
 const Stack = createNativeStackNavigator<CommunitiesStackParamList>();
