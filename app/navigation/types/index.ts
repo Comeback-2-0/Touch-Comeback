@@ -11,3 +11,8 @@ export interface MoodFeed {
   mood: string;
   reels: Reel[];
 }
+
+export type ChatStackParamList = {
+  GroupList: undefined;
+  GroupChatScreen: { group: { id: string; name: string; members: number } };
+};
