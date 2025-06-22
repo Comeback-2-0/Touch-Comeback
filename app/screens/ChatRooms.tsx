@@ -78,6 +78,7 @@ export default function ChatRoom({route}: Props) {
             {item.senderAnonymousId}: {item.content}
           </Text>
         )}
+        removeClippedSubviews={false}
       />
 
       <View style={styles.inputBox}>

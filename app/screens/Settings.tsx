@@ -74,7 +74,6 @@ export default function SettingsScreen() {
 
   return (
     <FlatList
-      //ListHeaderComponent={<Text style={styles.title}>Settings</Text>}
       data={settingsSections.flatMap((section) => [
         { type: 'header', title: section.title },
         ...section.data.map((item) => ({ ...item, type: 'item' })),
@@ -90,6 +89,7 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.container}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       showsVerticalScrollIndicator={false}
+      removeClippedSubviews={false}
     />
   );
 }
