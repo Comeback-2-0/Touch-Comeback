@@ -1,42 +1,28 @@
-// app/navigation/AppStack.tsx
 import React from 'react';
-import { createBottomTabNavigator, BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
-import { RouteProp } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet } from 'react-native';
-
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import FontAwesome6 from 'react-native-vector-icons/FontAwesome6';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import Foundation from 'react-native-vector-icons/Foundation';
+import FontAwesome6 from 'react-native-vector-icons/FontAwesome6';
+import { PostQueueProvider } from '../context/PostQueueContext';
 
 import Feed from '../screens/Feed';
 import PostReels from '../screens/ReelScreen';
 import SearchBar from '../screens/SearchBar';
-import CommunitiesStack from './CommunityStack';
+import CommunityStack from './CommunityStack';
 import ProfileStack from './ProfileStack';
 
-export type MainTabParamList = {
-  Home: undefined;
-  Communities: undefined;
-  Reels: undefined;
-  SearchBar: undefined;
-  ProfileTab: undefined;
-};
+const Tab = createBottomTabNavigator();
 
-const Tab = createBottomTabNavigator<MainTabParamList>();
-
-export default function AppStack() {
+function BottomTabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({
-        route,
-      }: {
-        route: RouteProp<MainTabParamList, keyof MainTabParamList>;
-      }): BottomTabNavigationOptions => ({
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: '#ff00ff',
-        tabBarInactiveTintColor: 'black',
+        tabBarActiveTintColor: '#ff69b4',
+        tabBarInactiveTintColor: 'gray',
         tabBarStyle: styles.tabBar,
         tabBarIcon: ({ color, size }) => {
           switch (route.name) {
@@ -57,7 +43,7 @@ export default function AppStack() {
       })}
     >
       <Tab.Screen name="Home" component={Feed} />
-      <Tab.Screen name="Communities" component={CommunitiesStack} />
+      <Tab.Screen name="Communities" component={CommunityStack} />
       <Tab.Screen name="Reels" component={PostReels} />
       <Tab.Screen name="SearchBar" component={SearchBar} />
       <Tab.Screen name="ProfileTab" component={ProfileStack} />
@@ -67,7 +53,17 @@ export default function AppStack() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: 'pink',
-    height: 45,
+    backgroundColor: '#ffe4e1',
+    height: 50,
+    borderTopWidth: 0,
+    elevation: 10,
   },
 });
+
+export default function AppStack() {
+  return (
+    <PostQueueProvider>
+      <BottomTabNavigator />
+    </PostQueueProvider>
+  );
+}
