@@ -9,4 +9,3 @@ export type SettingsStackParamList = {
   CommunityGuidelines: undefined;
   ReportProblem: undefined;
 };
-

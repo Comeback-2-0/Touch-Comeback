@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import AuthStack from './AuthStack';
 import AppStack from './AppStack';
+
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
