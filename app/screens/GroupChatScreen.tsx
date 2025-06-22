@@ -111,6 +111,7 @@ const GroupChatScreen = ({ navigation, route }: Props) => {
               </View>
             )}
             ListHeaderComponent={<Text style={styles.subtitle}>Comments</Text>}
+            removeClippedSubviews={false}
           />
           <CommentBox onSubmit={handleComment} />
         </>
@@ -123,6 +124,7 @@ const GroupChatScreen = ({ navigation, route }: Props) => {
         data={queue}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <QueueCard content={item.content} />}
+        removeClippedSubviews={false}
       />
 
       <TouchableOpacity onPress={goToCreatePost} style={styles.newPostBtn}>
