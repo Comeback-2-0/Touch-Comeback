@@ -98,6 +98,7 @@ export default function Communities({ navigation }: Props) {
   );
 
   return (
+    
     <View style={styles.container}>
       <Text style={styles.title}>Communities</Text>
       <FlatList

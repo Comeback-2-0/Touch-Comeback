@@ -3,6 +3,7 @@
   "compilerOptions": {
     "jsx": "react-native",  // Override or add extra settings
     "strict": true,
+    "esModuleInterop": true,
     "baseUrl": "app/src",
     "paths": {
       "@icons/*": ["assets/icons/*"],
