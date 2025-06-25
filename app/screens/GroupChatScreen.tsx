@@ -63,7 +63,6 @@ export default function GroupChatScreen({navigation, route}: Props) {
         const existingReplies = comments[commentIndex].replies || [];
         comments[commentIndex].replies = [...existingReplies, res.data];
       }
-
       setPosts(updatedPosts);
     } catch (err) {
       console.error('Reply failed:', err);
@@ -87,7 +86,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
-      headerTitle: group.name, // ✅ Set group name as title
+      headerTitle: group.name,
       headerRight: () => (
         <View style={{flexDirection: 'row', gap: 12}}>
           <TouchableOpacity onPress={goToQueue}>
@@ -106,9 +105,9 @@ export default function GroupChatScreen({navigation, route}: Props) {
       if (queue.length > 0) {
         const mostLiked = queue.reduce((a, b) => (a.likes > b.likes ? a : b));
         setPosts(prev => [mostLiked, ...prev]);
-        removePostFromQueue(mostLiked.id); // ✅ use context-based removal
+        removePostFromQueue(mostLiked.id); 
       }
-    }, 6 * 60 * 60 * 1000); // every 6 hours
+    }, 6 * 60 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [queue]);
@@ -131,8 +130,6 @@ export default function GroupChatScreen({navigation, route}: Props) {
                     ↪ {reply.text}
                   </Text>
                 ))}
-
-                {/* ✅ CommentBox for replies */}
                 <CommentBox
                   onSubmit={text => handleReply(item._id, text)}
                   placeholder="Reply to comment"

@@ -1,0 +1,1238 @@
+react as a senior SDE working on this touch mobile app
+you are supposed to help me in making the anomynous chat section of the app
+
+ok let me tell you how much work we have done
+the main entry point is chatnavigator 
+// app/navigation/AppStack.tsx
+      <Tab.Screen name="ChatTab"  children={() => (
+          <PostQueueProvider>
+            <ChatNavigator />
+          </PostQueueProvider>
+        )}
+      />
+
+// app/navigation/ChatNavigator.tsx
+export type ChatStackParamList = {
+  GroupListScreen: undefined;
+  GroupChatScreen: {
+    group: { id: string; name: string; members: number };
+    userId: string;
+  };
+  CreatePostScreen: {
+    group: { id: string; name: string; members: number };
+    userId: string;
+  };
+};
+
+const Stack = createNativeStackNavigator<ChatStackParamList>();
+
+export default function ChatNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="GroupListScreen" component={GroupListScreen} />
+      <Stack.Screen name="GroupChatScreen" component={GroupChatScreen} />
+      <Stack.Screen name="CreatePostScreen" component={CreatePostScreen} />
+    </Stack.Navigator>
+  );
+}
+then these screens
+//app/screens/GroupListScreen.tsx
+type Props = NativeStackScreenProps<ChatStackParamList, 'GroupListScreen'>;
+
+type Group = {
+  _id: string;
+  name: string;
+  members: string[];
+  latestPost?: {
+    content: string;
+  };
+};
+
+export default function GroupListScreen({navigation}: Props) {
+  const {user, loading} = useAuth();
+  const userId = user?.uid ?? '';
+  const [joinedGroups, setJoinedGroups] = useState<Group[]>([]);
+  const [trendingGroups, setTrendingGroups] = useState<Group[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Group[]>([]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadGroups = async () => {
+      try {
+        const joinedRes = await fetchJoinedGroups(userId);
+        const trendingRes = await fetchTrendingGroups();
+        setJoinedGroups(joinedRes.data);
+        setTrendingGroups(trendingRes.data);
+      } catch (err) {
+        console.error('Error loading groups:', err);
+      }
+    };
+    loadGroups();
+  }, [userId]);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) {
+      const res = await searchGroups(query);
+      setSearchResults(res.data);
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  const handleJoin = async (groupId: string) => {
+    try {
+      await joinGroup(groupId, userId);
+      const joinedRes = await fetchJoinedGroups(userId);
+      setJoinedGroups(joinedRes.data);
+    } catch (err) {
+      console.error('Join failed:', err);
+    }
+  };
+
+  const renderGroup = (group: Group, showJoin = false) => (
+    <GroupCard
+      key={group._id}
+      name={group.name}
+      members={group.members.length}
+      latestPost={group.latestPost?.content ?? 'No posts yet'}
+      unreadCount={0}
+      onPress={() =>
+        navigation.navigate('GroupChatScreen', {
+          group: {
+            id: group._id, // 👈 convert _id to id
+            name: group.name,
+            members: group.members.length, // 👈 convert array to count
+          },
+          userId,
+        })
+      }
+      joinButton={showJoin}
+      onJoinPress={() => handleJoin(group._id)}
+    />
+  );
+
+  if (loading || !userId) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container}>
+      {/* Search Bar */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search groups..."
+        value={searchQuery}
+        onChangeText={handleSearch}
+      />
+
+      {/* Search Results */}
+      {searchResults.length > 0 && (
+        <>
+          <Text style={styles.sectionHeader}>Search Results</Text>
+          {searchResults.map(group => renderGroup(group, true))}
+        </>
+      )}
+
+      {/* My Groups */}
+      <Text style={styles.sectionHeader}>My Groups</Text>
+      {joinedGroups.map(group => renderGroup(group))}
+
+      {/* Trending Groups */}
+      <Text style={styles.sectionHeader}>Trending Groups</Text>
+      {trendingGroups.map(group =>
+        joinedGroups.find(g => g._id === group._id)
+          ? null
+          : renderGroup(group, true),
+      )}
+    </ScrollView>
+  );
+};
+
+// app/screens/GroupChatScreen.tsx
+type Props = NativeStackScreenProps<ChatStackParamList, 'GroupChatScreen'>;
+
+export default function GroupChatScreen({navigation, route}: Props) {
+  const {group, userId} = route.params;
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [activePostIndex, setActivePostIndex] = useState(0);
+  const socketRef = useRef<any>(null);
+  const {queue, removePostFromQueue} = usePostQueue();
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        const res = await fetchGroupPosts(group.id);
+        setPosts(res.data); 
+      } catch (err) {
+        console.error('Failed to fetch posts:', err);
+      }
+    };
+
+    loadPosts();
+  }, []);
+
+  const activePost = posts[activePostIndex];
+
+  const handleLike = () => {
+    const updated = [...posts];
+    updated[activePostIndex].likes++;
+    setPosts(updated);
+  };
+
+  const handleComment = async (text: string) => {
+    const postId = posts[activePostIndex]._id;
+    try {
+      const res = await commentOnPost(postId, text, userId);
+      const updatedPosts = [...posts];
+      updatedPosts[activePostIndex].comments.push(res.data);
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Comment failed:', err);
+    }
+  };
+
+  const handleReply = async (commentId: string, text: string) => {
+    try {
+      const res = await replyToComment(commentId, text, userId);
+      const updatedPosts = [...posts];
+      const comments = updatedPosts[activePostIndex].comments;
+
+      const commentIndex = comments.findIndex(c => c._id === commentId);
+      if (commentIndex !== -1) {
+        const existingReplies = comments[commentIndex].replies || [];
+        comments[commentIndex].replies = [...existingReplies, res.data];
+      }
+
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Reply failed:', err);
+    }
+  };
+
+  const goToCreatePost = () => {
+    navigation.navigate('CreatePostScreen', {
+      group,
+      userId,
+    });
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (queue.length > 0) {
+        const mostLiked = queue.reduce((a, b) => (a.likes > b.likes ? a : b));
+        setPosts(prev => [mostLiked, ...prev]);
+        removePostFromQueue(mostLiked.id); // ✅ use context-based removal
+      }
+    }, 6 * 60 * 60 * 1000); // every 6 hours
+
+    return () => clearInterval(interval);
+  }, [queue]);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>{group.name}</Text>
+
+      {activePost ? (
+        <>
+          <PostCard post={activePost} onLike={handleLike} />
+          <FlatList
+            data={activePost.comments}
+            keyExtractor={item => item._id}
+            renderItem={({item}) => (
+              <View style={styles.commentBubble}>
+                <Text>{item.text}</Text>
+
+                {item.replies?.map(reply => (
+                  <Text key={reply._id ?? reply.text} style={styles.replyText}>
+                    ↪ {reply.text}
+                  </Text>
+                ))}
+
+                {/* ✅ CommentBox for replies */}
+                <CommentBox
+                  onSubmit={text => handleReply(item._id, text)}
+                  placeholder="Reply to comment"
+                />
+              </View>
+            )}
+            ListHeaderComponent={<Text style={styles.subtitle}>Comments</Text>}
+            removeClippedSubviews={false}
+          />
+          <CommentBox onSubmit={handleComment} />
+        </>
+      ) : (
+        <Text style={styles.noPost}>No active post</Text>
+      )}
+
+      <Text style={styles.subtitle}>Queue</Text>
+      <FlatList
+        data={queue}
+        keyExtractor={item => item.id}
+        renderItem={({item}) => <QueueCard content={item.content} />}
+        removeClippedSubviews={false}
+      />
+
+      <TouchableOpacity onPress={goToCreatePost} style={styles.newPostBtn}>
+        <Text style={styles.newPostText}>+ New Post</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// app/screens/CreatePostScreen.tsx
+type Props = NativeStackScreenProps<ChatStackParamList, 'CreatePostScreen'>;
+
+export default function CreatePostScreen({ route, navigation }: Props) {
+  const { group, userId } = route.params;
+  const { addPostToQueue } = usePostQueue();
+  const [text, setText] = useState('');
+  const socketRef = useRef<any>(null);
+
+  const handlePost = () => {
+    if (!text.trim()) return;
+
+    const newPost: Post = {
+      id: Date.now().toString(),
+      content: text,
+      likes: 0,
+      comments: [],
+    };
+
+    // ✅ Send message through socket
+    if (!socketRef.current) {
+      socketRef.current = io('http://localhost:3333');
+    }
+
+    socketRef.current.emit('sendMessage', {
+      communityId: group.id,
+      text,
+      senderAnonymousId: userId,
+    });
+
+    // ✅ Add post to queue using context
+    addPostToQueue(newPost);
+
+    navigation.goBack();
+  };
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        placeholder="Write your post..."
+        value={text}
+        onChangeText={setText}
+        multiline
+        style={styles.input}
+      />
+      <Button title="Post" onPress={handlePost} color="#4CAF50" />
+    </View>
+  );
+};
+
+// app/navigation/types/Post.ts
+export type Post = { _id: string;  groupId: string;  content: string;  isQueued: boolean;  likes: number;  votes: number;  comments: Comment[];  approvedAt?: string;  createdAt: string;
+};
+
+export type Comment = {  _id: string;  userId: string;  text: string;  replies?: {    _id?: string;    userId: string;    text: string;    createdAt?: string;  }[];
+};
+// app/navigation/types/community.ts
+export type Community = {  _id: string;  name: string; membersCount: number;  image: string;
+};
+
+// app/components/CommentBox.tsx
+type Props = {
+  onSubmit: (text: string) => void;
+  placeholder?: string; 
+};
+
+const CommentBox: React.FC<Props> = ({ onSubmit, placeholder = 'Add a comment' }) => {
+  const [text, setText] = useState('');
+
+  const handleSubmit = () => {
+    if (text.trim()) {
+      onSubmit(text);
+      setText('');
+    }
+  };
+
+  return (
+    <View style={styles.box}>
+      <TextInput
+        placeholder={placeholder} 
+        value={text}
+        onChangeText={setText}
+        style={styles.input}
+      />
+      <Button title="Send" onPress={handleSubmit} />
+    </View>
+  );
+};
+// app/components/PostCard.tsx
+type Props = {
+  post: Post;
+  onLike: () => void;
+};
+const PostCard: React.FC<Props> = ({ post, onLike }) => {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.content}>{post.content}</Text>
+      <View style={styles.footer}>
+        <Text style={styles.likes}>Likes: {post.likes}</Text>
+        <TouchableOpacity onPress={onLike} style={styles.likeBtn}>
+          <Text style={styles.likeText}>❤️ Like</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+// app/components/GroupCard.tsx
+type Props = {
+  name: string;
+  members: number;
+  latestPost?: string;
+  unreadCount?: number;
+  onPress: () => void;
+  joinButton?: boolean;
+  onJoinPress?: () => void;
+};
+
+export default function GroupCard({
+  name,
+  members,
+  latestPost,
+  unreadCount,
+  onPress,
+  joinButton,
+  onJoinPress,
+}: Props) {
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.card}>
+      <View>
+        <Text style={styles.name}>{name}</Text>
+        <Text style={styles.members}>{members} members</Text>
+        {latestPost && <Text style={styles.preview}>{latestPost}</Text>}
+        {typeof unreadCount === 'number' && <Text>Unread: {unreadCount}</Text>}
+        {joinButton && (
+          <TouchableOpacity onPress={onJoinPress} style={styles.joinBtn}>
+            <Text style={styles.joinText}>Join</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+// app/components/QueueCard.tsx
+interface Props {
+  content: string;
+}
+
+const QueueCard: React.FC<Props> = ({ content }) => {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.text}>{content}</Text>
+    </View>
+  );
+};
+// app/components/QueueItem.tsx
+export default function QueueItem({ text }: { text: string }) {
+  return (
+    <View style={styles.item}>
+      <Text>{text}</Text>
+    </View>
+  );
+}
+// app/screens/QueueScreen.tsx
+export default function QueueScreen({ route }: any) {
+  const groupId = route.params.groupId;
+  const [queue, setQueue] = useState<Post[]>([]);
+
+  useEffect(() => {
+    fetchQueue(groupId).then((res) => setQueue(res.data));
+  }, []);
+
+  const handleVote = async (id: string) => {
+    await voteQueuePost(id);
+    setQueue((prev) =>
+      prev.map((p) => (p._id === id ? { ...p, votes: p.votes + 1 } : p))
+    );
+  };
+
+  const handleReport = async (id: string) => {
+    await reportQueuePost(id);
+    Alert.alert('Reported');
+  };
+  
+  return (
+    <View style={styles.container}>
+      <Text style={styles.heading}>Queue</Text>
+      <FlatList
+        data={queue}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.content}>{item.content}</Text>
+            <Text>Votes: {item.votes}</Text>
+            <View style={styles.btnRow}>
+              <TouchableOpacity onPress={() => handleVote(item._id)} style={styles.btn}>
+                <Text>👍 Vote</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleReport(item._id)} style={styles.btn}>
+                <Text>⚠️ Report</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+the below is my backend structure
+├─ package.json
+├─ tsconfig.json
+├─ index.js
+├─ app.js        
+├─ config/
+│    └─ db.js       
+├─ middlewares/
+├─ routes/     
+├─ controllers/
+└─ utils/
+
+now help me in few things will go step by step 1st digest all what i have , then will move ahead don't give dump me code in response to this , will move step by step suggest me required changes then i will tell what i want then after that start the coding part with me 1st will figure out what we want actually
+for now this above code was working but need a lot more changes
+
+
+ok this was the issue you are getting it wrong by anonymous , the thing is let me explain you the whole flow , see in that 
+chatnavigator we are going to see group list these are the goups we can join and interact coment share anonymously , like 
+we have a group , user can share a post not just chat like a post tweet with or without photo so they had a context what 
+are they talking about , like wise we can't allow them directly to share anything on the group else it will be a dumpset 
+where people just dump not interact , so we decided to make a queue for that when people post their post will go to the 
+queue where most active group members or anyone can go and see the post and upvote it , the post from the queue which got 
+the highest number of votes will be posted next day to the group , like we have set a criteria every 24 hours the top post 
+from queue will be posted to the group in the group , group member can interact with the post they can comment like the post , 
+anonymosly , here the thing comes you don't know who posted that you have a context and you can share your thoughts freely 
+no one is judging you also you can reply to others comment like if there is a post , the group shows all the posts users go 
+and comment on the post then users can also comment on others comment on that post also and that onpens a list of 
+conversation going in reply of that comment so that everyone can engage on the comment of that post
+this was the whole point of building the app users who are busy can checkout app every 24hrs to get what people are talking about 
+more active members can engage hours on talking about that post , and users who have lot of time can browse the queue and 
+decide on what will come next on the group in queue they can only vote , comments and like will be when it is posted on the group 
+current status of app - its showing the groups that are created in mongodb but there are lots of issue in this but before that take time
+understand the whole idea next will move on to making this 
+
+here you are wrong
+✅ Current Status
+From your code and explanation:
+Group creation, joining, and fetching: ✅ Working
+Post submission to queue: ✅ Working
+Queue voting: ✅ Working
+Post promotion every 24hrs: ✅ Implemented in frontend via interval logic
+Post display with comments and replies: ✅ Frontend working
+Socket setup: ✅ Basic usage in CreatePost screen
+
+for this version we don't allow users to create groups its going to be hardcoded by me in mongodbcompass 
+joining group is there user can join group but the ui is lame the this group list screen has lots of problem will solve next
+taking about search there are lot of problem , when searching its not helping me in search by suggestions also there is no ux
+like one can't confirm these are the search result or suggestion , also there are many issues we will work on serch screen later 
+for now our focus will be on creating the post see for now users can't post its just hardcoded , also i don't think we should give 
+post option in the main screen like a big rectangular button in the top where there is this heading we can add a post button from 
+there they can post also inside any group they just dumped both posts and queue also its not scrollable we don't want like that
+we will provide a proper queue section the button of queue will be there in this groupchat screen like will place the post option
+button will be there in the screen not the queue itself , the main screen will show posts 
+for now lets focus on that creating post , with photos not just text and displaying them in the queue , after that will solve the UI of the post
+
+ok so lets me tell you we already have a tunnel in my laptop which is going to host the backend of touch so i won't be using coudinary for now , store those files in that backend and get url from there ,
+we do have a api.ts file in frontend , and tunnel is on api.comeback.website
+below are all the codes you asked
+// app/screens/GroupChatScreen.tsx
+type Props = NativeStackScreenProps<ChatStackParamList, 'GroupChatScreen'>;
+
+export default function GroupChatScreen({navigation, route}: Props) {
+  const {group, userId} = route.params;
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [activePostIndex, setActivePostIndex] = useState(0);
+  const socketRef = useRef<any>(null);
+  const {queue, removePostFromQueue} = usePostQueue();
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        const res = await fetchGroupPosts(group.id);
+        setPosts(res.data); 
+      } catch (err) {
+        console.error('Failed to fetch posts:', err);
+      }
+    };
+
+    loadPosts();
+  }, []);
+
+  const activePost = posts[activePostIndex];
+
+  const handleLike = () => {
+    const updated = [...posts];
+    updated[activePostIndex].likes++;
+    setPosts(updated);
+  };
+
+  const handleComment = async (text: string) => {
+    const postId = posts[activePostIndex]._id;
+    try {
+      const res = await commentOnPost(postId, text, userId);
+      const updatedPosts = [...posts];
+      updatedPosts[activePostIndex].comments.push(res.data);
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Comment failed:', err);
+    }
+  };
+
+  const handleReply = async (commentId: string, text: string) => {
+    try {
+      const res = await replyToComment(commentId, text, userId);
+      const updatedPosts = [...posts];
+      const comments = updatedPosts[activePostIndex].comments;
+
+      const commentIndex = comments.findIndex(c => c._id === commentId);
+      if (commentIndex !== -1) {
+        const existingReplies = comments[commentIndex].replies || [];
+        comments[commentIndex].replies = [...existingReplies, res.data];
+      }
+
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Reply failed:', err);
+    }
+  };
+
+  const goToCreatePost = () => {
+    navigation.navigate('CreatePostScreen', {
+      group,
+      userId,
+    });
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (queue.length > 0) {
+        const mostLiked = queue.reduce((a, b) => (a.likes > b.likes ? a : b));
+        setPosts(prev => [mostLiked, ...prev]);
+        removePostFromQueue(mostLiked.id); // ✅ use context-based removal
+      }
+    }, 6 * 60 * 60 * 1000); // every 6 hours
+
+    return () => clearInterval(interval);
+  }, [queue]);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>{group.name}</Text>
+
+      {activePost ? (
+        <>
+          <PostCard post={activePost} onLike={handleLike} />
+          <FlatList
+            data={activePost.comments}
+            keyExtractor={item => item._id}
+            renderItem={({item}) => (
+              <View style={styles.commentBubble}>
+                <Text>{item.text}</Text>
+
+                {item.replies?.map(reply => (
+                  <Text key={reply._id ?? reply.text} style={styles.replyText}>
+                    ↪ {reply.text}
+                  </Text>
+                ))}
+
+                {/* ✅ CommentBox for replies */}
+                <CommentBox
+                  onSubmit={text => handleReply(item._id, text)}
+                  placeholder="Reply to comment"
+                />
+              </View>
+            )}
+            ListHeaderComponent={<Text style={styles.subtitle}>Comments</Text>}
+            removeClippedSubviews={false}
+          />
+          <CommentBox onSubmit={handleComment} />
+        </>
+      ) : (
+        <Text style={styles.noPost}>No active post</Text>
+      )}
+
+      <Text style={styles.subtitle}>Queue</Text>
+      <FlatList
+        data={queue}
+        keyExtractor={item => item.id}
+        renderItem={({item}) => <QueueCard content={item.content} />}
+        removeClippedSubviews={false}
+      />
+
+      <TouchableOpacity onPress={goToCreatePost} style={styles.newPostBtn}>
+        <Text style={styles.newPostText}>+ New Post</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+your task is to add the create post icon in the top bar where the group title is shown also the queue icon(will work later)
+
+// app/screens/CreatePostScreen.tsx
+type Props = NativeStackScreenProps<ChatStackParamList, 'CreatePostScreen'>;
+
+export default function CreatePostScreen({ route, navigation }: Props) {
+  const { group, userId } = route.params;
+  const { addPostToQueue } = usePostQueue();
+  const [text, setText] = useState('');
+  const socketRef = useRef<any>(null);
+
+  const handlePost = () => {
+    if (!text.trim()) return;
+
+    const newPost: Post = {
+      id: Date.now().toString(),
+      content: text,
+      likes: 0,
+      comments: [],
+    };
+
+    // ✅ Send message through socket
+    if (!socketRef.current) {
+      socketRef.current = io('http://localhost:3333');
+    }
+
+    socketRef.current.emit('sendMessage', {
+      communityId: group.id,
+      text,
+      senderAnonymousId: userId,
+    });
+
+    // ✅ Add post to queue using context
+    addPostToQueue(newPost);
+
+    navigation.goBack();
+  };
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        placeholder="Write your post..."
+        value={text}
+        onChangeText={setText}
+        multiline
+        style={styles.input}
+      />
+      <Button title="Post" onPress={handlePost} color="#4CAF50" />
+    </View>
+  );
+};
+your task make a better UI with photo and all as disccussed earlier
+// app/navigation/ChatNavigator.tsx
+export type ChatStackParamList = {
+  GroupListScreen: undefined;
+  GroupChatScreen: {
+    group: { id: string; name: string; members: number };
+    userId: string;
+  };
+  CreatePostScreen: {
+    group: { id: string; name: string; members: number };
+    userId: string;
+  };
+};
+// post.js
+const mongoose = require('mongoose');
+
+const postSchema = new mongoose.Schema({
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },
+  content: String,
+  isQueued: { type: Boolean, default: true },
+  likes: { type: Number, default: 0 },
+  votes: { type: Number, default: 0 },
+  comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
+  approvedAt: Date,
+  createdAt: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model('Post', postSchema);
+//postroutes
+const express = require('express');
+const {
+  getApprovedPosts,
+  createComment,
+  likePost,
+  replyToComment,
+} = require('../controllers/postController');
+const router = express.Router();
+
+router.get('/:groupId/posts', getApprovedPosts);
+router.post('/:postId/like', likePost);
+router.post('/:postId/comment', createComment);
+router.post('/comments/:commentId/reply', replyToComment);
+
+module.exports = router;
+// postController
+const Post = require('../models/Post');
+const Comment = require('../models/Comment');
+
+exports.getApprovedPosts = async (req, res) => {
+  const posts = await Post.find({
+    groupId: req.params.groupId,
+    isQueued: false,
+  })
+    .sort({ approvedAt: -1 })
+    .populate('comments');
+  res.json(posts);
+};
+
+exports.likePost = async (req, res) => {
+  const post = await Post.findById(req.params.postId);
+  post.likes += 1;
+  await post.save();
+  res.json({ message: 'Liked' });
+};
+
+exports.createComment = async (req, res) => {
+  const { text, userId } = req.body;
+  const comment = new Comment({ postId: req.params.postId, text, userId });
+  await comment.save();
+
+  await Post.findByIdAndUpdate(req.params.postId, {
+    $push: { comments: comment._id },
+  });
+
+  res.json(comment);
+};
+
+exports.replyToComment = async (req, res) => {
+  const { text, userId } = req.body;
+  const comment = await Comment.findById(req.params.commentId);
+
+  comment.replies.push({ text, userId });
+  await comment.save();
+
+  res.json({ message: 'Reply added' });
+};
+// app.js (Express initialization)
+require('dotenv').config();                     // Load .env file if present (for MONGO_URI, JWT_SECRET, etc.)
+const express = require('express');
+const connectDB = require('./config/db');       
+const userRoutes = require('./routes/userRoutes');
+const postRoutes = require('./routes/postRoutes');
+const authRoutes = require('./routes/auth');
+const communityRoutes = require('./routes/communityRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const groupRoutes = require('./routes/groupRoutes');
+const path = require('path');
+const bodyParser = require('body-parser');
+
+
+const app = express();
+app.use(express.json());                        // Body parser for JSON
+
+app.use(bodyParser.json()); // to parse JSON
+app.use('/auth', authRoutes);
+app.use('/messages', messageRoutes);
+app.use('/communities', communityRoutes);
+app.use('/groups', groupRoutes); 
+app.use('/posts', postRoutes);
+
+// Fallback route to serve index.html for root URL
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/videos/:filename', (req, res) => {
+  const filePath = path.join(__dirname, 'public/videos', req.params.filename);
+  const fs = require('fs');
+
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    const chunkSize = end - start + 1;
+    const file = fs.createReadStream(filePath, { start, end });
+    const head = {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': 'video/mp4',
+    };
+
+    res.writeHead(206, head);
+    file.pipe(res);
+  } else {
+    const head = {
+      'Content-Length': fileSize,
+      'Content-Type': 'video/mp4',
+    };
+
+    res.writeHead(200, head);
+    fs.createReadStream(filePath).pipe(res);
+  }
+});
+
+
+module.exports = app;
+// server.js
+require("dotenv").config(); // Load variables from .env
+const connectDB = require("./config/db"); // centralised connection helper
+const app = require("./app"); // Express instance
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
+
+const PORT = process.env.PORT || 3333;
+
+(async function startServer() {
+  try {
+    await connectDB();
+    console.log("✅ MongoDB connected");
+
+    // ⏰ Start cron jobs
+    require('./utils/cron');
+    console.log("🕒 Cron job initialized");
+
+    // 2️⃣ Start the HTTP server ----------------------------------------------
+    const httpServer = http.createServer(app);
+
+    const io = new Server(httpServer, {
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+      },
+    });
+
+    io.on("connection", (socket) => {
+      console.log("🔌 New user connected");
+
+      socket.on("joinRoom", (communityId) => {
+        socket.join(communityId);
+      });
+
+      socket.on(
+        "sendMessage",
+        ({ communityId, content, senderAnonymousId }) => {
+          io.to(communityId).emit("newMessage", {
+            content,
+            senderAnonymousId,
+            createdAt: new Date(),
+          });
+        }
+      );
+
+      socket.on("disconnect", () => {
+        console.log("❌ User disconnected");
+      });
+    });
+
+    httpServer.listen(PORT, () =>
+      console.log(`🚀 Server with socket.io running on port ${PORT}`)
+    );
+
+    // 3️⃣ Graceful shutdown handlers -----------------------------------------
+    const gracefulExit = () => {
+      console.log("\n⏳ Shutting down gracefully...");
+      httpServer.close(() => {
+        require("mongoose").connection.close(false, () => {
+          console.log("🛑 MongoDB connection closed");
+          process.exit(0);
+        });
+      });
+    };
+
+    process.on("SIGINT", gracefulExit); // Ctrl-C
+    process.on("SIGTERM", gracefulExit); // kill command / Heroku dyno restart
+    process.on("unhandledRejection", (err) => {
+      console.error("🚨 Unhandled Promise rejection:", err);
+      gracefulExit();
+    });
+  } catch (err) {
+    console.error("❌ MongoDB connection failed:", err);
+    process.exit(1); // Exit with failure
+  }
+})();
+
+
+reactnativeimagepicker is not installed
+Ok now guide me step by step
+
+// app/screens/CreatePostScreen.tsx
+
+type Props = NativeStackScreenProps<ChatStackParamList, 'GroupChatScreen'>;
+
+export default function GroupChatScreen({navigation, route}: Props) {
+  const {group, userId} = route.params;
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [activePostIndex, setActivePostIndex] = useState(0);
+  const socketRef = useRef<any>(null);
+  const {queue, removePostFromQueue} = usePostQueue();
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        const res = await fetchGroupPosts(group.id);
+        setPosts(res.data);
+      } catch (err) {
+        console.error('Failed to fetch posts:', err);
+      }
+    };
+
+    loadPosts();
+  }, []);
+
+  const activePost = posts[activePostIndex];
+
+  const handleLike = () => {
+    const updated = [...posts];
+    updated[activePostIndex].likes++;
+    setPosts(updated);
+  };
+
+  const handleComment = async (text: string) => {
+    const postId = posts[activePostIndex]._id;
+    try {
+      const res = await commentOnPost(postId, text, userId);
+      const updatedPosts = [...posts];
+      updatedPosts[activePostIndex].comments.push(res.data);
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Comment failed:', err);
+    }
+  };
+
+  const handleReply = async (commentId: string, text: string) => {
+    try {
+      const res = await replyToComment(commentId, text, userId);
+      const updatedPosts = [...posts];
+      const comments = updatedPosts[activePostIndex].comments;
+
+      const commentIndex = comments.findIndex(c => c._id === commentId);
+      if (commentIndex !== -1) {
+        const existingReplies = comments[commentIndex].replies || [];
+        comments[commentIndex].replies = [...existingReplies, res.data];
+      }
+
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Reply failed:', err);
+    }
+  };
+
+  const goToCreatePost = () => {
+    navigation.navigate('CreatePostScreen', {
+      group,
+      userId,
+    });
+  };
+
+  const goToQueue = () => {
+    navigation.navigate('QueueScreen', {
+      group,
+      userId,
+    });
+  };
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      headerTitle: group.name, // ✅ Set group name as title
+      headerRight: () => (
+        <View style={{flexDirection: 'row', gap: 12}}>
+          <TouchableOpacity onPress={goToQueue}>
+            <Icon name="list" size={22} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={goToCreatePost}>
+            <Icon name="add" size={22} color="black" />
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (queue.length > 0) {
+        const mostLiked = queue.reduce((a, b) => (a.likes > b.likes ? a : b));
+        setPosts(prev => [mostLiked, ...prev]);
+        removePostFromQueue(mostLiked.id); // ✅ use context-based removal
+      }
+    }, 6 * 60 * 60 * 1000); // every 6 hours
+
+    return () => clearInterval(interval);
+  }, [queue]);
+
+  return (
+    <View style={styles.container}>
+
+      {activePost ? (
+        <>
+          <PostCard post={activePost} onLike={handleLike} />
+          <FlatList
+            data={activePost.comments}
+            keyExtractor={item => item._id}
+            renderItem={({item}) => (
+              <View style={styles.commentBubble}>
+                <Text>{item.text}</Text>
+
+                {item.replies?.map((reply, index) => (
+                  <Text key={reply._id || index} style={styles.replyText}>
+                    ↪ {reply.text}
+                  </Text>
+                ))}
+
+                {/* ✅ CommentBox for replies */}
+                <CommentBox
+                  onSubmit={text => handleReply(item._id, text)}
+                  placeholder="Reply to comment"
+                />
+              </View>
+            )}
+            ListHeaderComponent={<Text style={styles.subtitle}>Comments</Text>}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            removeClippedSubviews={false}
+          />
+          <CommentBox onSubmit={handleComment} />
+        </>
+      ) : (
+        <Text style={styles.noPost}>No active post</Text>
+      )}
+    </View>
+  );
+}
+
+dont just randomly suggest me changes try to find out where can be the issue in this code or in frontend or backend or else where and how it can be solved
+
+
+below is my code 
+// app/screens/QueueScreen.tsx
+
+type Props = NativeStackScreenProps<ChatStackParamList, 'QueueScreen'>;
+
+export default function QueueScreen({navigation, route}: Props) {
+  const {group, userId} = route.params;
+  const [queue, setQueue] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const goToCreatePost = () => {
+    navigation.navigate('CreatePostScreen', {group, userId});
+  };
+
+  const voteOnPost = async (postId: string) => {
+    try {
+      await fetch(`${API_URL}/queue/${postId}/vote`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({userId}),
+      });
+      setQueue(prev =>
+        prev.map(p => (p._id === postId ? {...p, votes: p.votes + 1} : p)),
+      );
+    } catch (err) {
+      console.error('Vote failed:', err);
+    }
+  };
+
+  const reportPost = async (postId: string) => {
+    try {
+      await fetch(`${API_URL}/queue/${postId}/report`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({userId}),
+      });
+      setQueue(prev =>
+        prev.map(p =>
+          p._id === postId
+            ? {
+                ...p,
+                reportedBy: [...(p.reportedBy || []), userId],
+              }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('Report failed:', err);
+    }
+  };
+
+  useEffect(() => {
+    const loadQueue = async () => {
+      try {
+        const res = await fetchQueuePosts(group.id, userId);
+        setQueue(res.data);
+      } catch (err) {
+        console.error('Failed to load queue:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadQueue();
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      {loading ? (
+        <ActivityIndicator size="large" color="#4CAF50" />
+      ) : (
+        <FlatList
+          data={queue}
+          keyExtractor={item => item._id}
+          renderItem={({item}) => {
+            const isReported = item.reportedBy?.includes(userId);
+
+            return (
+              <View style={[styles.card, isReported && {opacity: 0.4}]}>
+                {item.image && (
+                  <Image
+                    source={{
+                      uri: item.image.startsWith('http')
+                        ? item.image
+                        : `https://api.comeback.website/${item.image}`,
+                    }}
+                    style={styles.image}
+                  />
+                )}
+                <Text style={styles.content}>{item.content}</Text>
+                <Text style={styles.voteCount}>🗳️ {item.votes} votes</Text>
+
+                {isReported && (
+                  <Text style={styles.reportedBadge}>🚩 You reported this</Text>
+                )}
+
+                <View style={styles.actions}>
+                  <TouchableOpacity onPress={() => voteOnPost(item._id)}>
+                    <Icon name="arrow-up" size={24} color="#4CAF50" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => reportPost(item._id)}>
+                    <Icon name="alert-circle" size={24} color="#FF5252" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No items in queue</Text>
+          }
+          removeClippedSubviews={false}
+        />
+      )}
+      <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
+        <Icon name="add" size={28} color="white" />
+      </TouchableOpacity>
+    </View>
+  );
+}

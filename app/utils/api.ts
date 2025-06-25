@@ -20,8 +20,8 @@ export const joinGroup = (groupId: string, userId: string) =>
   api.post(`/groups/${groupId}/join`, { userId });
 
 // ------------------- QUEUE APIs -------------------
-export const fetchQueuePosts = (groupId: string) =>
-  api.get(`/queue/${groupId}`);
+export const fetchQueuePosts = (groupId: string, userId: string) =>
+  api.get(`/queue/${groupId}?userId=${userId}`);
 
 export const createQueuePost = (groupId: string, content: string) =>
   api.post(`/queue/${groupId}`, { content });

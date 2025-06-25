@@ -12,7 +12,7 @@ import {
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ChatStackParamList} from '../navigation/ChatNavigator';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {fetchQueuePosts} from '../utils/api';
+import {fetchQueuePosts, API_URL} from '../utils/api';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'QueueScreen'>;
 
@@ -25,10 +25,84 @@ export default function QueueScreen({navigation, route}: Props) {
     navigation.navigate('CreatePostScreen', {group, userId});
   };
 
+  const voteOnPost = async (postId: string) => {
+    const post = queue.find(p => p._id === postId);
+    const hasVoted = post?.votedBy?.includes(userId);
+
+    try {
+      await fetch(`${API_URL}/queue/${postId}/vote`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({userId}),
+      });
+
+      setQueue(prev =>
+        prev.map(p =>
+          p._id === postId
+            ? {
+                ...p,
+                votes: p.votes + (hasVoted ? -1 : 1),
+                votedBy: hasVoted
+                  ? p.votedBy.filter((id: string) => id !== userId)
+                  : [...(p.votedBy || []), userId],
+              }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('Vote failed:', err);
+    }
+  };
+
+  const reportPost = async (postId: string) => {
+    try {
+      await fetch(`${API_URL}/queue/${postId}/report`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({userId}),
+      });
+      setQueue(prev =>
+        prev.map(p =>
+          p._id === postId
+            ? {
+                ...p,
+                reportedBy: [...(p.reportedBy || []), userId],
+              }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('Report failed:', err);
+    }
+  };
+
+  const undoReportPost = async (postId: string) => {
+    try {
+      await fetch(`${API_URL}/queue/${postId}/unreport`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({userId}),
+      });
+
+      setQueue(prev =>
+        prev.map(p =>
+          p._id === postId
+            ? {
+                ...p,
+                reportedBy: p.reportedBy.filter((id: string) => id !== userId),
+              }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('Undo report failed:', err);
+    }
+  };
+
   useEffect(() => {
     const loadQueue = async () => {
       try {
-        const res = await fetchQueuePosts(group.id);
+        const res = await fetchQueuePosts(group.id, userId);
         setQueue(res.data);
       } catch (err) {
         console.error('Failed to load queue:', err);
@@ -47,22 +121,48 @@ export default function QueueScreen({navigation, route}: Props) {
         <FlatList
           data={queue}
           keyExtractor={item => item._id}
-          renderItem={({item}) => (
-            <View style={styles.card}>
-              {item.image && (
-                <Image
-                  source={{
-                    uri: item.image.startsWith('http')
-                      ? item.image
-                      : `https://api.comeback.website/${item.image}`,
-                  }}
-                  style={styles.image}
-                />
-              )}
-              <Text style={styles.content}>{item.content}</Text>
-              <Text style={styles.voteCount}>👍 {item.votes} votes</Text>
-            </View>
-          )}
+          renderItem={({item}) => {
+            const isReported = item.reportedBy?.includes(userId);
+
+            return (
+              <View style={[styles.card, isReported && {opacity: 0.4}]}>
+                {item.image && (
+                  <Image
+                    source={{
+                      uri: item.image.startsWith('http')
+                        ? item.image
+                        : `https://api.comeback.website/${item.image}`,
+                    }}
+                    style={styles.image}
+                  />
+                )}
+                <Text style={styles.content}>{item.content}</Text>
+                <Text style={styles.voteCount}>🗳️ {item.votes} votes</Text>
+
+                {isReported && (
+                  <View style={styles.reportOverlay}>
+                    <Text style={styles.reportText}>
+                      You reported this post
+                    </Text>
+                    <TouchableOpacity onPress={() => undoReportPost(item._id)}>
+                      <Text style={styles.undoReport}>Undo Report</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {!isReported && (
+                  <View style={styles.actions}>
+                    <TouchableOpacity onPress={() => voteOnPost(item._id)}>
+                      <Icon name="arrow-up" size={24} color="#4CAF50" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => reportPost(item._id)}>
+                      <Icon name="alert-circle" size={24} color="#FF5252" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          }}
           ListEmptyComponent={
             <Text style={styles.empty}>No items in queue</Text>
           }
@@ -100,4 +200,46 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   voteCount: {marginTop: 6, color: '#888'},
+  reportedBadge: {
+    color: '#FF5252',
+    fontSize: 13,
+    marginTop: 6,
+  },
+  actions: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 30,
+  },
+  reportOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    borderRadius: 12,
+  },
+
+  reportText: {
+    color: 'white',
+    fontSize: 35,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+    transform: [{rotate: '-25deg'}],
+  },
+
+  undoReport: {
+    color: '#fff',
+    backgroundColor: '#000000aa',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    fontSize: 14,
+    overflow: 'hidden',
+  },
 });
