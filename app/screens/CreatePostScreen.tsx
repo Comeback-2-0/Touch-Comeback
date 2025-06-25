@@ -1,48 +1,117 @@
-import React, { useRef, useState } from 'react';
-import { View, TextInput, Button, StyleSheet } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ChatStackParamList } from '../navigation/ChatNavigator';
-import { Post } from '../types/Post';
-import { io } from 'socket.io-client';
-import { usePostQueue } from '../context/PostQueueContext';
+// app/screens/CreatePostScreen.tsx
+import React, {useRef, useState} from 'react';
+import {
+  View,
+  TextInput,
+  Button,
+  StyleSheet,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  PermissionsAndroid,
+  Platform,
+} from 'react-native';
+import {
+  launchCamera,
+  launchImageLibrary,
+  Asset,
+} from 'react-native-image-picker';
+import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {ChatStackParamList} from '../navigation/ChatNavigator';
+import {uploadPost} from '../utils/api';
+import PostPreview from '../components/PostPreview';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'CreatePostScreen'>;
 
-const CreatePostScreen = ({ route, navigation }: Props) => {
-  const { group, userId } = route.params;
-  const { addPostToQueue } = usePostQueue(); // ✅ Use context instead of onPostCreated
+export default function CreatePostScreen({route, navigation}: Props) {
   const [text, setText] = useState('');
-  const socketRef = useRef<any>(null);
+  const [image, setImage] = useState<Asset | null>(null);
+  const [loading, setLoading] = useState(false);
+  const {group, userId} = route.params;
 
-  const handlePost = () => {
-    if (!text.trim()) return;
+  const requestPermissions = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        ]);
 
-    const newPost: Post = {
-      id: Date.now().toString(),
-      content: text,
-      likes: 0,
-      comments: [],
-    };
+        const allGranted = Object.values(granted).every(
+          status => status === PermissionsAndroid.RESULTS.GRANTED,
+        );
 
-    // ✅ Send message through socket
-    if (!socketRef.current) {
-      socketRef.current = io('http://localhost:3333');
+        if (!allGranted) {
+          Alert.alert(
+            'Permission Denied',
+            'Camera and storage permissions are required',
+          );
+          return false;
+        }
+      } catch (err) {
+        console.warn('Permission error:', err);
+        return false;
+      }
     }
 
-    socketRef.current.emit('sendMessage', {
-      communityId: group.id,
-      text,
-      senderAnonymousId: userId,
+    return true;
+  };
+
+  const pickFromGallery = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    launchImageLibrary({mediaType: 'photo'}, response => {
+      if (response.assets && response.assets.length > 0) {
+        setImage(response.assets[0]);
+      }
     });
+  };
 
-    // ✅ Add post to queue using context
-    addPostToQueue(newPost);
+  const openCamera = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
 
-    navigation.goBack();
+    launchCamera({mediaType: 'photo'}, response => {
+      if (response.assets && response.assets.length > 0) {
+        setImage(response.assets[0]);
+      }
+    });
+  };
+
+  const handlePost = async () => {
+    if (!text.trim()) return;
+
+    try {
+      setLoading(true);
+
+      const formData = new FormData();
+      formData.append('content', text);
+      formData.append('groupId', group.id);
+
+      if (image) {
+        formData.append('image', {
+          uri: image.uri,
+          name: image.fileName || 'photo.jpg',
+          type: image.type || 'image/jpeg',
+        });
+      }
+
+      await uploadPost(formData);
+      navigation.goBack();
+    } catch (err) {
+      console.error('Error uploading post:', err);
+      Alert.alert('Error', 'Could not upload post');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <TextInput
         placeholder="Write your post..."
         value={text}
@@ -50,22 +119,38 @@ const CreatePostScreen = ({ route, navigation }: Props) => {
         multiline
         style={styles.input}
       />
-      <Button title="Post" onPress={handlePost} color="#4CAF50" />
-    </View>
+
+      <PostPreview text={text} image={image} />
+
+      <View style={styles.buttonRow}>
+        <Button title="📷 Camera" onPress={openCamera} />
+        <Button title="🖼️ Gallery" onPress={pickFromGallery} />
+      </View>
+
+      <View style={{height: 20}} />
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#4CAF50" />
+      ) : (
+        <Button title="🚀 Submit Post" onPress={handlePost} color="#4CAF50" />
+      )}
+    </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#FFF' },
+  container: {padding: 16, flexGrow: 1},
   input: {
-    height: 150,
-    borderColor: '#CCC',
+    height: 120,
+    borderColor: '#ccc',
     borderWidth: 1,
-    borderRadius: 10,
     padding: 12,
-    marginBottom: 20,
+    borderRadius: 12,
+    marginBottom: 16,
     textAlignVertical: 'top',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
 });
-
-export default CreatePostScreen;

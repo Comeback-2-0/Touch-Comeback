@@ -1,6 +1,7 @@
+// app/components/PostCard.tsx
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Post } from '../types/Post';
+import { Post } from '../navigation/types/Post';
 
 type Props = {
   post: Post;

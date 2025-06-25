@@ -23,7 +23,7 @@ type Group = {
   };
 };
 
-const GroupListScreen: React.FC<Props> = ({navigation}) => {
+export default function GroupListScreen({navigation}: Props) {
   const {user, loading} = useAuth();
   const userId = user?.uid ?? '';
   const [joinedGroups, setJoinedGroups] = useState<Group[]>([]);
@@ -44,7 +44,6 @@ const GroupListScreen: React.FC<Props> = ({navigation}) => {
         console.error('Error loading groups:', err);
       }
     };
-
     loadGroups();
   }, [userId]);
 
@@ -152,5 +151,3 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 });
-
-export default GroupListScreen;

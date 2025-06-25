@@ -1,60 +1,35 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ChatStackParamList } from '../navigation/ChatNavigator';
+// app/screens/GroupChatScreen.tsx
+import React, {useEffect, useRef, useState, useLayoutEffect} from 'react';
+import {View, Text, StyleSheet, FlatList, TouchableOpacity} from 'react-native';
+import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {ChatStackParamList} from '../navigation/ChatNavigator';
 import PostCard from '../components/PostCard';
-import QueueCard from '../components/QueueCard';
 import CommentBox from '../components/CommentBox';
-import { io } from 'socket.io-client';
-import { Post, Comment } from '../types/Post';
-import { usePostQueue } from '../context/PostQueueContext'; // ✅ Use context instead of navigation callback
+import {Post, Comment} from '../navigation/types/Post';
+import {usePostQueue} from '../context/PostQueueContext';
+import {fetchGroupPosts, commentOnPost, replyToComment} from '../utils/api';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'GroupChatScreen'>;
 
-const GroupChatScreen = ({ navigation, route }: Props) => {
-  const { group, userId } = route.params;
+export default function GroupChatScreen({navigation, route}: Props) {
+  const {group, userId} = route.params;
   const [posts, setPosts] = useState<Post[]>([]);
   const [activePostIndex, setActivePostIndex] = useState(0);
   const socketRef = useRef<any>(null);
-  const { queue, removePostFromQueue } = usePostQueue(); // ✅ From context
+  const {queue, removePostFromQueue} = usePostQueue();
 
   useEffect(() => {
-    socketRef.current = io('http://localhost:3333');
-
-    socketRef.current.emit('joinRoom', {
-      communityId: group.id,
-      senderAnonymousId: userId,
-    });
-
-    socketRef.current.on('chat_history', (messages: any[]) => {
-      const postList: Post[] = messages.map((msg) => ({
-        id: msg._id,
-        content: msg.text,
-        likes: 0,
-        comments: [],
-      }));
-      setPosts(postList);
-    });
-
-    socketRef.current.on('newMessage', (msg: any) => {
-      const newPost: Post = {
-        id: msg._id,
-        content: msg.text,
-        likes: 0,
-        comments: [],
-      };
-      setPosts((prev) => [newPost, ...prev]);
-    });
-
-    return () => {
-      socketRef.current.disconnect();
+    const loadPosts = async () => {
+      try {
+        const res = await fetchGroupPosts(group.id);
+        setPosts(res.data);
+      } catch (err) {
+        console.error('Failed to fetch posts:', err);
+      }
     };
+
+    loadPosts();
   }, []);
 
   const activePost = posts[activePostIndex];
@@ -65,15 +40,34 @@ const GroupChatScreen = ({ navigation, route }: Props) => {
     setPosts(updated);
   };
 
-  const handleComment = (text: string) => {
-    const updated = [...posts];
-    const newComment: Comment = {
-      id: Date.now().toString(),
-      user: userId,
-      text,
-    };
-    updated[activePostIndex].comments.push(newComment);
-    setPosts(updated);
+  const handleComment = async (text: string) => {
+    const postId = posts[activePostIndex]._id;
+    try {
+      const res = await commentOnPost(postId, text, userId);
+      const updatedPosts = [...posts];
+      updatedPosts[activePostIndex].comments.push(res.data);
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Comment failed:', err);
+    }
+  };
+
+  const handleReply = async (commentId: string, text: string) => {
+    try {
+      const res = await replyToComment(commentId, text, userId);
+      const updatedPosts = [...posts];
+      const comments = updatedPosts[activePostIndex].comments;
+
+      const commentIndex = comments.findIndex(c => c._id === commentId);
+      if (commentIndex !== -1) {
+        const existingReplies = comments[commentIndex].replies || [];
+        comments[commentIndex].replies = [...existingReplies, res.data];
+      }
+
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error('Reply failed:', err);
+    }
   };
 
   const goToCreatePost = () => {
@@ -83,11 +77,35 @@ const GroupChatScreen = ({ navigation, route }: Props) => {
     });
   };
 
+  const goToQueue = () => {
+    navigation.navigate('QueueScreen', {
+      group,
+      userId,
+    });
+  };
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      headerTitle: group.name, // ✅ Set group name as title
+      headerRight: () => (
+        <View style={{flexDirection: 'row', gap: 12}}>
+          <TouchableOpacity onPress={goToQueue}>
+            <Icon name="list" size={22} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={goToCreatePost}>
+            <Icon name="add" size={22} color="black" />
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (queue.length > 0) {
         const mostLiked = queue.reduce((a, b) => (a.likes > b.likes ? a : b));
-        setPosts((prev) => [mostLiked, ...prev]);
+        setPosts(prev => [mostLiked, ...prev]);
         removePostFromQueue(mostLiked.id); // ✅ use context-based removal
       }
     }, 6 * 60 * 60 * 1000); // every 6 hours
@@ -97,20 +115,32 @@ const GroupChatScreen = ({ navigation, route }: Props) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{group.name}</Text>
 
       {activePost ? (
         <>
           <PostCard post={activePost} onLike={handleLike} />
           <FlatList
             data={activePost.comments}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
+            keyExtractor={item => item._id}
+            renderItem={({item}) => (
               <View style={styles.commentBubble}>
                 <Text>{item.text}</Text>
+
+                {item.replies?.map((reply, index) => (
+                  <Text key={reply._id || index} style={styles.replyText}>
+                    ↪ {reply.text}
+                  </Text>
+                ))}
+
+                {/* ✅ CommentBox for replies */}
+                <CommentBox
+                  onSubmit={text => handleReply(item._id, text)}
+                  placeholder="Reply to comment"
+                />
               </View>
             )}
             ListHeaderComponent={<Text style={styles.subtitle}>Comments</Text>}
+            contentContainerStyle={{ paddingBottom: 80 }}
             removeClippedSubviews={false}
           />
           <CommentBox onSubmit={handleComment} />
@@ -118,36 +148,24 @@ const GroupChatScreen = ({ navigation, route }: Props) => {
       ) : (
         <Text style={styles.noPost}>No active post</Text>
       )}
-
-      <Text style={styles.subtitle}>Queue</Text>
-      <FlatList
-        data={queue}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <QueueCard content={item.content} />}
-        removeClippedSubviews={false}
-      />
-
-      <TouchableOpacity onPress={goToCreatePost} style={styles.newPostBtn}>
-        <Text style={styles.newPostText}>+ New Post</Text>
-      </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#F5F5F5' },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 12, color: '#444' },
-  subtitle: { fontSize: 16, fontWeight: '600', marginTop: 20, marginBottom: 6 },
-  commentBubble: { backgroundColor: '#EEE', padding: 8, borderRadius: 6, marginVertical: 4 },
-  noPost: { color: '#777', textAlign: 'center', marginTop: 20 },
-  newPostBtn: {
-    backgroundColor: '#AEC6CF',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 20,
+  container: {flex: 1, padding: 16, backgroundColor: '#F5F5F5'},
+  subtitle: {fontSize: 16, fontWeight: '600', marginTop: 20, marginBottom: 6},
+  commentBubble: {
+    backgroundColor: '#EEE',
+    padding: 8,
+    borderRadius: 6,
+    marginVertical: 4,
   },
-  newPostText: { fontSize: 16, fontWeight: '600', color: '#333' },
+  noPost: {color: '#777', textAlign: 'center', marginTop: 20},
+  replyText: {
+    marginLeft: 10,
+    fontStyle: 'italic',
+    fontSize: 13,
+    color: '#666',
+  },
 });
-
-export default GroupChatScreen;

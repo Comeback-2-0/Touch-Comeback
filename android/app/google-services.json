@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "160562514921-i6dnrkjbooeuq5e5p2aamh2gr5ktrd7d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "roy.ij.touch",
+            "certificate_hash": "31e184faa09140b5b216243c7065a0dfde099a3a"
+          }
+        },
+        {
           "client_id": "160562514921-k0d8ohhtijm8rmc0v4j4pulqnreu7qbc.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
