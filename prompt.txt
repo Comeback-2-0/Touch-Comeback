@@ -1236,3 +1236,188 @@ export default function QueueScreen({navigation, route}: Props) {
     </View>
   );
 }
+
+// app/screens/GroupChatScreen.tsx
+
+type Props = NativeStackScreenProps<ChatStackParamList, 'GroupChatScreen'>;
+
+export default function GroupChatScreen({navigation, route}: Props) {
+  const flatListRef = useRef<FlatList<Post>>(null);
+  const {group, userId} = route.params;
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [commentMode, setCommentMode] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        const res = await fetchGroupPosts(group.id);
+        setPosts(res.data);
+      } catch (err) {
+        console.error('Failed to fetch posts:', err);
+      }
+    };
+    loadPosts();
+  }, []);
+
+  const goToCreatePost = () => {
+    navigation.navigate('CreatePostScreen', {
+      group,
+      userId,
+    });
+  };
+
+  const goToQueue = () => {
+    navigation.navigate('QueueScreen', {
+      group,
+      userId,
+    });
+  };
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      headerTitle: group.name,
+      headerRight: () => (
+        <View style={{flexDirection: 'row', gap: 12}}>
+          <TouchableOpacity onPress={goToQueue}>
+            <Icon name="list" size={22} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={goToCreatePost}>
+            <Icon name="add" size={22} color="black" />
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation]);
+
+  useLayoutEffect(() => {
+    const parent = navigation.getParent();
+
+    if (parent) {
+      parent.setOptions({
+        tabBarStyle: commentMode ? {display: 'none'} : undefined,
+      });
+    }
+  }, [commentMode, navigation]);
+
+  return (
+    <View style={styles.container}>
+      {commentMode && selectedPost ? (
+        <>
+          {/* 📌 Focused post */}
+          <PostCard post={selectedPost} minimal />
+          <View style={styles.commentHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                setCommentMode(false);
+                setSelectedPost(null);
+              }}>
+              <Icon name="arrow-back" size={22} color="black" />
+            </TouchableOpacity>
+            <Text style={styles.commentTitle}>Comments</Text>
+          </View>
+
+          {/* 💬 Scrollable comment section */}
+          <View style={styles.commentSection}>
+            <CommentList
+              comments={[...selectedPost.comments].sort(
+                (a, b) => (b.likes || 0) - (a.likes || 0),
+              )}
+              onReply={() => {}}
+              onLike={commentId => {
+                const updatedComments = selectedPost.comments.map(c =>
+                  c._id === commentId ? {...c, likes: (c.likes || 0) + 1} : c,
+                );
+                const updated = {...selectedPost, comments: updatedComments};
+                setSelectedPost(updated);
+                setPosts(prev =>
+                  prev.map(p => (p._id === updated._id ? updated : p)),
+                );
+              }}
+              onDislike={commentId => {
+                const updatedComments = selectedPost.comments.map(c =>
+                  c._id === commentId
+                    ? {...c, dislikes: (c.dislikes || 0) + 1}
+                    : c,
+                );
+                const updated = {...selectedPost, comments: updatedComments};
+                setSelectedPost(updated);
+                setPosts(prev =>
+                  prev.map(p => (p._id === updated._id ? updated : p)),
+                );
+              }}
+              onReport={commentId =>
+                console.log('Reported comment:', commentId)
+              }
+            />
+          </View>
+          {/* 📝 Fixed Add Comment Box */}
+          <CommentBox
+            onSubmit={async text => {
+              try {
+                const res = await commentOnPost(selectedPost._id, text, userId);
+                const updated = {
+                  ...selectedPost,
+                  comments: [...selectedPost.comments, res.data],
+                };
+                setSelectedPost(updated);
+                setPosts(prev =>
+                  prev.map(p => (p._id === updated._id ? updated : p)),
+                );
+              } catch (err) {
+                console.error('Comment failed:', err);
+              }
+            }}
+            placeholder="Add a comment..."
+          />
+        </>
+      ) : posts.length > 0 ? (
+        <FlatList
+          ref={flatListRef}
+          data={posts}
+          inverted
+          keyExtractor={p => p._id}
+          renderItem={({item}) => (
+            <PostCard
+              post={item}
+              onLike={async () => {
+                const updated = posts.map(p =>
+                  p._id === item._id ? {...p, likes: p.likes + 1} : p,
+                );
+                setPosts(updated);
+              }}
+              onDislike={() => {
+                const updated = posts.map(p =>
+                  p._id === item._id
+                    ? {...p, dislikes: (p.dislikes || 0) + 1}
+                    : p,
+                );
+                setPosts(updated);
+              }}
+              onShare={() => {
+                console.log('Shared:', item._id);
+              }}
+              onReport={() => {
+                console.log('Reported:', item._id);
+              }}
+              onOpenComments={() => {
+                setSelectedPost(item);
+                setCommentMode(true);
+              }}
+            />
+          )}
+          onScrollToIndexFailed={({index}) => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({index, animated: true});
+            }, 300);
+          }}
+          contentContainerStyle={{paddingTop: 12, paddingBottom: 80}}
+          removeClippedSubviews={false}
+        />
+      ) : (
+        <Text style={styles.noPost}>No posts yet</Text>
+      )}
+    </View>
+  );
+}

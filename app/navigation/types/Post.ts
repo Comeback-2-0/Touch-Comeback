@@ -5,9 +5,11 @@ export type Post = {
   content: string;
   isQueued: boolean;
   likes: number;
+  dislikes?: number;       
   votes: number;
   comments: Comment[];
-  approvedAt?: string;
+  image?: string;
+  approvedAt: string;
   createdAt: string;
 };
 
@@ -15,10 +17,17 @@ export type Comment = {
   _id: string;
   userId: string;
   text: string;
-  replies?: {
-    _id?: string;
-    userId: string;
-    text: string;
-    createdAt?: string;
-  }[];
+  createdAt: string;
+  likes: number;
+  dislikes: number;
+  likedBy?: string[];
+  dislikedBy?: string[];
+  replies?: Reply[];
+};
+
+export type Reply = {
+  _id?: string;
+  userId: string;
+  text: string;
+  createdAt?: string;
 };

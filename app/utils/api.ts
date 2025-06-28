@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Comment } from '../navigation/types/Post';
 
 export const API_URL = 'https://api.comeback.website';
 
@@ -37,14 +38,33 @@ export const reportQueuePost = (postId: string) =>
 export const fetchGroupPosts = (groupId: string) =>
   api.get(`/posts/${groupId}/posts`);
 
-export const likePost = (postId: string) =>
-  api.post(`/posts/${postId}/like`);
+export const likePost = (postId: string, userId: string) =>
+  api.post(`/posts/${postId}/like`, { userId });
+
+export const dislikePost = (postId: string, userId: string) =>
+  api.post(`/posts/${postId}/dislike`, { userId });
 
 export const commentOnPost = (postId: string, text: string, userId: string) =>
   api.post(`/posts/${postId}/comment`, { text, userId });
 
+// ------------------- REPLIES API -------------------
+export const fetchReplies = (commentId: string) =>
+  api.get<Comment[]>(`/comments/${commentId}/replies`);
+
+// ----------- COMMENT ACTION APIs -----------
+
+//  These toggle the like/dislike state
+export const likeComment = (commentId: string, userId: string) =>
+  api.post(`/comments/${commentId}/like`, { userId });
+
+export const dislikeComment = (commentId: string, userId: string) =>
+  api.post(`/comments/${commentId}/dislike`, { userId });
+
+export const reportComment = (commentId: string, userId: string) =>
+  api.post(`/comments/${commentId}/report`, { userId });
+
 export const replyToComment = (commentId: string, text: string, userId: string) =>
-  api.post(`/posts/comments/${commentId}/reply`, { text, userId });
+  api.post(`/comments/${commentId}/replies`, { text, userId });
 
 export const uploadPost = async (formData: FormData) =>
   api.post('/posts/create', formData, {

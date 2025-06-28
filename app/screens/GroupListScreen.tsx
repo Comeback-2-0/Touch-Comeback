@@ -1,6 +1,15 @@
 //app/screens/GroupListScreen.tsx
 import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, TextInput, Text, ScrollView} from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TextInput,
+  Text,
+  ScrollView,
+  Modal,
+  Pressable,
+  Alert,
+} from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ChatStackParamList} from '../navigation/ChatNavigator';
 import GroupCard from '../components/GroupCard';
@@ -30,6 +39,8 @@ export default function GroupListScreen({navigation}: Props) {
   const [trendingGroups, setTrendingGroups] = useState<Group[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Group[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -74,16 +85,22 @@ export default function GroupListScreen({navigation}: Props) {
       members={group.members.length}
       latestPost={group.latestPost?.content ?? 'No posts yet'}
       unreadCount={0}
-      onPress={() =>
-        navigation.navigate('GroupChatScreen', {
-          group: {
-            id: group._id, // 👈 convert _id to id
-            name: group.name,
-            members: group.members.length, // 👈 convert array to count
-          },
-          userId,
-        })
-      }
+      onPress={() => {
+        const isJoined = joinedGroups.some(g => g._id === group._id);
+        if (isJoined) {
+          navigation.navigate('GroupChatScreen', {
+            group: {
+              id: group._id,
+              name: group.name,
+              members: group.members.length,
+            },
+            userId,
+          });
+        } else {
+          setSelectedGroup(group);
+          setShowModal(true);
+        }
+      }}
       joinButton={showJoin}
       onJoinPress={() => handleJoin(group._id)}
     />
@@ -126,9 +143,47 @@ export default function GroupListScreen({navigation}: Props) {
           ? null
           : renderGroup(group, true),
       )}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showModal}
+        onRequestClose={() => setShowModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Join Group</Text>
+            {selectedGroup && (
+              <>
+                <Text style={styles.modalGroupName}>{selectedGroup.name}</Text>
+                <Text>{selectedGroup.members.length} members</Text>
+                <Text style={{marginVertical: 8}}>
+                  Latest post:{' '}
+                  {selectedGroup.latestPost?.content || 'No posts yet'}
+                </Text>
+              </>
+            )}
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.button, {backgroundColor: '#ccc'}]}
+                onPress={() => setShowModal(false)}>
+                <Text>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.button, {backgroundColor: '#4CAF50'}]}
+                onPress={async () => {
+                  if (selectedGroup) {
+                    await handleJoin(selectedGroup._id);
+                    setShowModal(false);
+                  }
+                }}>
+                <Text style={{color: '#fff'}}>Join</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -149,5 +204,38 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 10,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    width: '85%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalGroupName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
+    gap: 12,
+  },
+  button: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
   },
 });
