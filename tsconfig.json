@@ -7,7 +7,7 @@
     "paths": {
       "@icons/*": ["assets/icons/*"],
     },
-    "types": ["react-native", "jest"]
+    "types": ["react-native", "jest"],
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]

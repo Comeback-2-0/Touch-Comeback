@@ -19,21 +19,29 @@ import {
 } from 'react-native';
 import Video, { VideoRef } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Ionicons';
+import axios from 'axios';
 
 interface Props {
+  id: string;
   uri: string;
   isActive: boolean;
   caption?: string;
+  reelId: string;
   user?: {
     username: string;
     profilePic: string;
   };
 }
 
+interface Comment {
+  _id: string;
+  text: string;
+}
+
 
 const { width, height } = Dimensions.get('window');
 
-const ReelCard: React.FC<Props> = ({ uri, isActive, caption, user }) => {
+const ReelCard: React.FC<Props> = ({ id, uri, isActive, caption, user, reelId  }) => {
   const videoRef = useRef<VideoRef>(null);
   const [saved, setSaved] = useState(false);
   const [paused, setPaused] = useState(!isActive);
@@ -42,20 +50,31 @@ const ReelCard: React.FC<Props> = ({ uri, isActive, caption, user }) => {
   const [likeCount, setLikeCount] = useState(120);
   const [showComments, setShowComments] = useState(false);
   const [commentInput, setCommentInput] = useState('');
-  const [comments, setComments] = useState([
-    { id: '1', text: '🔥🔥🔥' },
-    { id: '2', text: 'Cool reel!' },
-    { id: '3', text: 'Awesome vibes' },
-    { id: '4', text: 'Hello Bunti, Tera sabun slow hai kya' },
-  ]);
+  const [comments, setComments] = useState<Comment[]>([]);
 
+  const [loadingComments, setLoadingComments] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(0);
- 
 
   useEffect(() => {
     setPaused(!isActive);
   }, [isActive]);
+
+  useEffect(() => {
+    const fetchComments = async () => {
+      try {
+        setLoadingComments(true);
+        const res = await axios.get("http://172.16.59.34:3333/api/reels/${reelId}/comments");
+        setComments(res.data);
+      } catch (err) {
+        console.error('Failed to fetch comments:', err);
+      } finally {
+        setLoadingComments(false);
+      }
+    };
+
+    if (showComments) fetchComments();
+  }, [showComments]);
 
   const handleLike = () => {
     const updated = !liked;
@@ -90,16 +109,27 @@ const ReelCard: React.FC<Props> = ({ uri, isActive, caption, user }) => {
     lastTap.current = now;
   };
 
-  const handleAddComment = () => {
-    if (commentInput.trim()) {
-      setComments([{ id: Date.now().toString(), text: commentInput }, ...comments]);
+ const handleAddComment = async () => {
+  if (commentInput.trim()) {
+    try {
+      const res = await axios.post("http://172.16.59.34:3333/api/reels/${reelId}/comments", {
+        text: commentInput,
+      });
+
+      // Update comments with new one from backend
+      setComments((prev) => [res.data.comment, ...prev]);
       setCommentInput('');
+    } catch (error) {
+      console.error('Failed to post comment:', error);
+      Alert.alert('Error', 'Could not post comment.');
     }
-  };
+  }
+};
+
 
   const handleShare = async () => {
     try {
-      const message = `🔥 Watch this reel on Touch:\n\n${uri}`;
+      const message = "🔥 Watch this reel on Touch:\n\n${uri}";
       await Share.share({ message });
     } catch (error) {
       Alert.alert('Sharing Failed', 'Unable to share the reel.');
@@ -107,24 +137,23 @@ const ReelCard: React.FC<Props> = ({ uri, isActive, caption, user }) => {
   };
 
   const handleSave = () => {
-  setSaved((prev) => !prev);
-};
+    setSaved((prev) => !prev);
+  };
 
-const handleReport = () => {
-  Alert.alert(
-    'Report Reel',
-    'Are you sure you want to report this reel?',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Report', onPress: () => Alert.alert('Reel reported. Thank you!') },
-    ],
-    { cancelable: true }
-  );
-};
+  const handleReport = () => {
+    Alert.alert(
+      'Report Reel',
+      'Are you sure you want to report this reel?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Report', onPress: () => Alert.alert('Reel reported. Thank you!') },
+      ],
+      { cancelable: true }
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* Tap to Play/Pause & Like */}
       <TouchableWithoutFeedback onPress={handleTap}>
         <View style={styles.videoWrapper}>
           <Video
@@ -147,68 +176,55 @@ const handleReport = () => {
         </View>
       </TouchableWithoutFeedback>
 
-      {/* Profile Info */}
-      {/* {user && (
-        <View style={styles.profileInfo}>
-          <Image source={{ uri: user.profilePic }} style={styles.profilePic} />
-          <Text style={styles.usernameText}>@{user.username}</Text>
-        </View>
-      )} */}
-
-      {/* Mute/Unmute */}
       <TouchableOpacity onPress={() => setMuted(!muted)} style={styles.muteToggle}>
         <Icon name={muted ? 'volume-mute' : 'volume-high'} size={26} color="white" />
       </TouchableOpacity>
 
-      {/* Right-side Actions */}
       <View style={styles.actions}>
-  <TouchableOpacity onPress={handleLike} style={{ alignItems: 'center' }}>
-    <Icon name={liked ? 'heart' : 'heart-outline'} size={28} color={liked ? 'red' : 'white'} />
-    <Text style={styles.actionLabel}>{likeCount}</Text>
-  </TouchableOpacity>
+        <TouchableOpacity onPress={handleLike} style={{ alignItems: 'center' }}>
+          <Icon name={liked ? 'heart' : 'heart-outline'} size={28} color={liked ? 'red' : 'white'} />
+          <Text style={styles.actionLabel}>{likeCount}</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={() => setShowComments(true)} style={{ alignItems: 'center' }}>
-    <Icon name="chatbubble-outline" size={28} color="white" />
-    <Text style={styles.actionLabel}>{comments.length}</Text>
-  </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowComments(true)} style={{ alignItems: 'center' }}>
+          <Icon name="chatbubble-outline" size={28} color="white" />
+          <Text style={styles.actionLabel}>{comments.length}</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={handleShare} style={{ alignItems: 'center' }}>
-    <Icon name="share-social-outline" size={28} color="white" />
-  </TouchableOpacity>
+        <TouchableOpacity onPress={handleShare} style={{ alignItems: 'center' }}>
+          <Icon name="share-social-outline" size={28} color="white" />
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={handleSave} style={{ alignItems: 'center' }}>
-    <Icon name={saved ? 'bookmark' : 'bookmark-outline'} size={26} color="white" />
-    <Text style={styles.actionLabel}>{saved ? 'Saved' : 'Save'}</Text>
-  </TouchableOpacity>
+        <TouchableOpacity onPress={handleSave} style={{ alignItems: 'center' }}>
+          <Icon name={saved ? 'bookmark' : 'bookmark-outline'} size={26} color="white" />
+          <Text style={styles.actionLabel}>{saved ? 'Saved' : 'Save'}</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={handleReport} style={{ alignItems: 'center' }}>
-    <Icon name="flag-outline" size={26} color="white" />
-    <Text style={styles.actionLabel}>Report</Text>
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity onPress={handleReport} style={{ alignItems: 'center' }}>
+          <Icon name="flag-outline" size={26} color="white" />
+          <Text style={styles.actionLabel}>Report</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Bottom Caption */}
       <View style={styles.bottomInfo}>
-  {user && (
-    <View style={styles.bottomUserRow}>
-      <Image source={{ uri: user.profilePic }} style={styles.profilePicSmall} />
-      <Text style={styles.usernameBottomText}>@{user.username}</Text>
-    </View>
-  )}
-  <Text style={styles.captionText}>{caption || '🎬 A cool reel!'}</Text>
+        {user && (
+          <View style={styles.bottomUserRow}>
+            <Image source={{ uri: user.profilePic }} style={styles.profilePicSmall} />
+            <Text style={styles.usernameBottomText}>@{user.username}</Text>
+          </View>
+        )}
+        <Text style={styles.captionText}>{caption || '🎬 A cool reel!'}</Text>
 
-  <View style={styles.musicRow}>
-    <Icon name="musical-notes" size={14} color="white" />
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <Text style={styles.musicText}>
-        Original sound • @{user?.username || 'touch_user'} 🎵🔥🔥🔥
-      </Text>
-    </ScrollView>
-  </View>
-</View>
+        <View style={styles.musicRow}>
+          <Icon name="musical-notes" size={14} color="white" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <Text style={styles.musicText}>
+              Original sound • @{user?.username || 'touch_user'} 🎵🔥🔥🔥
+            </Text>
+          </ScrollView>
+        </View>
+      </View>
 
-
-      {/* Comment Modal */}
       <Modal
         visible={showComments}
         animationType="slide"
@@ -226,7 +242,7 @@ const handleReport = () => {
 
             <FlatList
               data={comments}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item._id }
               renderItem={({ item }) => <Text style={styles.commentText}>• {item.text}</Text>}
               style={{ flex: 1 }}
             />
@@ -254,6 +270,11 @@ const handleReport = () => {
     </View>
   );
 };
+
+// styles unchanged ...
+
+
+
 
 const styles = StyleSheet.create({
   container: { width, height, backgroundColor: 'black', position: 'relative' },
@@ -398,4 +419,4 @@ usernameBottomText: {
   },
 });
 
-export default ReelCard;
+export default ReelCard;

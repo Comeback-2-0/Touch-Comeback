@@ -6,14 +6,16 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import Foundation from 'react-native-vector-icons/Foundation';
 import FontAwesome6 from 'react-native-vector-icons/FontAwesome6';
 import { PostQueueProvider } from '../context/PostQueueContext';
-
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Feed from '../screens/Feed';
 import PostReels from '../screens/ReelScreen';
 import SearchBar from '../screens/SearchBar';
 import CommunityStack from './CommunityStack';
 import ProfileStack from './ProfileStack';
-
+import ReelNavigator from './ReelNavigator';
 const Tab = createBottomTabNavigator();
+
 
 function BottomTabNavigator() {
   return (
@@ -43,11 +45,28 @@ function BottomTabNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={Feed} />
-      <Tab.Screen name="Communities" component={CommunityStack} />
+      <Tab.Screen name="Communities"
+        children={() => (
+          <PostQueueProvider>
+            <CommunityStack />
+          </PostQueueProvider>
+        )}
+      />
       <Tab.Screen name="Reels" component={PostReels} />
       <Tab.Screen name="SearchBar" component={SearchBar} />
       <Tab.Screen name="ProfileTab" component={ProfileStack} />
     </Tab.Navigator>
+  );
+}
+
+const Stack = createNativeStackNavigator();
+
+export default function AppStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
+      <Stack.Screen name="ReelNavigator" component={ReelNavigator} />
+    </Stack.Navigator>
   );
 }
 
@@ -60,10 +79,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default function AppStack() {
-  return (
-    <PostQueueProvider>
-      <BottomTabNavigator />
-    </PostQueueProvider>
-  );
-}
+

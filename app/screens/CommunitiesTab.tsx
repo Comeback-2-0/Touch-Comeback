@@ -1,5 +1,4 @@
-// app/screens/CommunitiesTab.tsx
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,27 +8,82 @@ import {
   Image,
   ListRenderItem,
 } from 'react-native';
-import axios from 'axios';
-import { API_URL } from '../utils/api';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CommunitiesStackParamList } from '../navigation/CommunityStack';
-import type { Community } from '../navigation/types/community';
 
-type Props = {
-  navigation: NativeStackNavigationProp<CommunitiesStackParamList, 'CommunitiesTabScreen'>;
+// Type for a community
+type Community = {
+  id: string;
+  name: string;
+  members: string;
+  image: string;
 };
 
+// Define the navigation prop type (adjust 'RootStackParamList' as needed)
+type Props = {
+  navigation: NativeStackNavigationProp<any>; // Replace 'any' with your actual type if you have a stack navigator
+};
 
+// Dummy data
+const communities: Community[] = [
+  {
+    id: '1',
+    name: 'Late Night Studies',
+    members: '2.1k Members',
+    image:
+      'https://photosbulk.com/wp-content/uploads/instagram-profile-picture-avatar_39.webp',
+  },
+  {
+    id: '2',
+    name: 'Comeback 2.0',
+    members: '1.3k Members',
+    image:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgkdr_DKgOXgnxgSGrfRUeoFgJEv3YY4VzkA&s',
+  },
+  {
+    id: '3',
+    name: 'Gaming Talk',
+    members: '4.8k Members',
+    image:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgkdr_DKgOXgnxgSGrfRUeoFgJEv3YY4VzkA&s',
+  },
+  {
+    id: '4',
+    name: 'Stressed Out',
+    members: '4.8k Members',
+    image:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgkdr_DKgOXgnxgSGrfRUeoFgJEv3YY4VzkA&s',
+  },
+  {
+    id: '5',
+    name: 'Aaj Ki Awaz',
+    members: '4.8k Members',
+    image:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgkdr_DKgOXgnxgSGrfRUeoFgJEv3YY4VzkA&s',
+  },
+  {
+    id: '7',
+    name: 'Random Banter',
+    members: '4.8k Members',
+    image:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgkdr_DKgOXgnxgSGrfRUeoFgJEv3YY4VzkA&s',
+  },
+  {
+    id: '8',
+    name: 'Kind Words',
+    members: '4.8k Members',
+    image:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgkdr_DKgOXgnxgSGrfRUeoFgJEv3YY4VzkA&s',
+  },
+  {
+    id: '9',
+    name: 'Motivational Corner',
+    members: '4.8k Members',
+    image:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgkdr_DKgOXgnxgSGrfRUeoFgJEv3YY4VzkA&s',
+  },
+];
 
 export default function Communities({ navigation }: Props) {
-  const [communities, setCommunities] = useState<Community[]>([]);
-
-  useEffect(() => {
-  axios.get(`${API_URL}/communities`).then((res) => {
-    setCommunities(res.data);
-  });
-}, []);
-
   const renderItem: ListRenderItem<Community> = ({ item }) => (
     <TouchableOpacity
       style={styles.item}
@@ -38,17 +92,18 @@ export default function Communities({ navigation }: Props) {
       <Image source={{ uri: item.image }} style={styles.avatar} />
       <View>
         <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.members}>{item.membersCount} Members</Text>
+        <Text style={styles.members}>{item.members}</Text>
       </View>
     </TouchableOpacity>
   );
 
   return (
+    
     <View style={styles.container}>
       <Text style={styles.title}>Communities</Text>
       <FlatList
         data={communities}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
