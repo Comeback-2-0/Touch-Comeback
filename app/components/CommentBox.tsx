@@ -1,11 +1,13 @@
+// app/components/CommentBox.tsx
 import React, { useState } from 'react';
 import { View, TextInput, Button, StyleSheet } from 'react-native';
 
 type Props = {
   onSubmit: (text: string) => void;
+  placeholder?: string; 
 };
 
-const CommentBox: React.FC<Props> = ({ onSubmit }) => {
+const CommentBox: React.FC<Props> = ({ onSubmit, placeholder = 'Add a comment' }) => {
   const [text, setText] = useState('');
 
   const handleSubmit = () => {
@@ -18,7 +20,7 @@ const CommentBox: React.FC<Props> = ({ onSubmit }) => {
   return (
     <View style={styles.box}>
       <TextInput
-        placeholder="Add a comment"
+        placeholder={placeholder} 
         value={text}
         onChangeText={setText}
         style={styles.input}
@@ -32,8 +34,8 @@ const styles = StyleSheet.create({
   box: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 30,
+    marginTop: 0,
+    marginBottom: 10,
   },
   input: {
     flex: 1,
