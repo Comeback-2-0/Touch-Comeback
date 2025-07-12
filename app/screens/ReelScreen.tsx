@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -7,108 +7,130 @@ import {
   StatusBar,
   Text,
   ActivityIndicator,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  ViewToken,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import axios from 'axios';
 import ReelCard from '../components/ReelCard';
+import auth from '@react-native-firebase/auth';
 
 const { height } = Dimensions.get('window');
-
-// Define types
-type Comment = {
-  id: string;
-  text: string;
-};
-
-type User = {
-  username: string;
-  profilePic: string;
-};
+const userId = auth().currentUser?.uid || '';
 
 type Reel = {
-  id: string;
-  uri: string;
-  caption: string;
-  music: string;
-  likeCount: number;
-  comments: Comment[];
-  user: User;
-  reelId?: string;
-};
-
-type MoodReel = {
+  _id: string;
+  videoUrl?: string;
   mood: string;
-  reels: Reel[];
+  hashtags: string[];
+  caption?: string;
+  creatorId: string;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  createdAt: string;
 };
 
 const MoodPagerScreen = () => {
-  const [reelsByMood, setReelsByMood] = useState<MoodReel[]>([]);
+  const [moods, setMoods] = useState<string[]>([]);
   const [activeMoodIndex, setActiveMoodIndex] = useState<number>(0);
+  const [reelsByMood, setReelsByMood] = useState<Record<string, Reel[]>>({});
+  const [pageByMood, setPageByMood] = useState<Record<string, number>>({});
+  const [activeReelIndexByMood, setActiveReelIndexByMood] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeReelIndexes, setActiveReelIndexes] = useState<number[]>([]);
   const pagerRef = useRef<PagerView>(null);
 
   useEffect(() => {
-    const fetchReels = async () => {
+    const fetchMoods = async () => {
       try {
-        const response = await axios.get('http://172.16.59.34:3333/api/reels');
-        setReelsByMood(response.data);
-        setActiveReelIndexes(Array(response.data.length).fill(0));
+        const response = await axios.get(`http://172.16.59.26:3333/api/reels/moods?userId=${userId}`);
+        setMoods(response.data);
       } catch (error) {
-        console.error('Failed to fetch reels:', error);
-      } finally {
-        setLoading(false);
+        console.error('Failed to fetch moods:', error);
       }
     };
 
-    fetchReels();
+    fetchMoods();
   }, []);
 
-  const handleReelScroll = (
-    moodIndex: number,
-    yOffset: number
-  ) => {
-    const index = Math.round(yOffset / height);
-    setActiveReelIndexes((prev) => {
-      const updated = [...prev];
-      updated[moodIndex] = index;
-      return updated;
-    });
+  useEffect(() => {
+    if (moods.length === 0) return;
+    fetchReelsForMood(moods[activeMoodIndex], 1);
+  }, [activeMoodIndex, moods]);
+
+  const fetchReelsForMood = async (mood: string, page: number) => {
+    try {
+      const response = await axios.get(
+        `http://172.16.59.26:3333/api/reels/feed?mood=${mood}&page=${page}&userId=${userId}`
+      );
+      setReelsByMood((prev) => ({
+        ...prev,
+        [mood]: page === 1 ? response.data : [...(prev[mood] || []), ...response.data],
+      }));
+      setPageByMood((prev) => ({ ...prev, [mood]: page }));
+    } catch (error) {
+      console.error(`Failed to fetch reels for mood ${mood}:`, error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const renderReels = (reels: Reel[], moodIndex: number) => {
+  const onViewableItemsChanged = useCallback(
+    (mood: string) =>
+      ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
+        if (viewableItems.length > 0) {
+          const currentIndex = viewableItems[0].index || 0;
+          setActiveReelIndexByMood((prev) => ({ ...prev, [mood]: currentIndex }));
+        }
+      },
+    []
+  );
+
+  const renderReels = (mood: string) => {
+    const reels = reelsByMood[mood] || [];
+    const activeIndex = activeReelIndexByMood[mood] || 0;
+
     return (
       <FlatList
         data={reels}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item._id}-${index}`}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ minHeight: height }}
-        onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-          handleReelScroll(moodIndex, e.nativeEvent.contentOffset.y);
+        onEndReached={() => fetchReelsForMood(mood, (pageByMood[mood] || 1) + 1)}
+        onEndReachedThreshold={0.2}
+        renderItem={({ item, index }) => {
+          const videoUrl = item.videoUrl?.trim().replace(/^\/+/g, '') || '';
+          return (
+            <ReelCard
+              id={item._id}
+              reelId={item._id}
+              uri={videoUrl}
+              isActive={index === activeIndex}
+              caption={item.caption}
+              mood={item.mood}
+              hashtags={item.hashtags}
+              creatorId={item.creatorId}
+              likes={item.likes}
+              comments={item.comments}
+              shares={item.shares}
+              saves={item.saves}
+              createdAt={item.createdAt}
+              userId={userId}
+            />
+          );
         }}
-        renderItem={({ item, index }) => (
-          <ReelCard
-            id={item.id}
-            reelId={item.reelId ?? ''}
-            uri={item.uri}
-            isActive={index === activeReelIndexes[moodIndex]}
-            caption={item.caption}
-            user={item.user}
-          />
-        )}
+        contentContainerStyle={{ minHeight: height }}
+        onViewableItemsChanged={onViewableItemsChanged(mood)}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 80 }}
       />
     );
   };
 
-  if (loading) {
+  if (loading && moods.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#fff" />
-        <Text style={{ color: 'white', marginTop: 10 }}>Loading reels...</Text>
+        <Text style={{ color: 'white', marginTop: 10 }}>Loading moods...</Text>
       </View>
     );
   }
@@ -116,21 +138,20 @@ const MoodPagerScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <View style={styles.moodLabel}>
-        <Text style={styles.moodText}>
-          {reelsByMood[activeMoodIndex]?.mood?.toUpperCase()}
-        </Text>
-      </View>
-
+      {moods.length > 0 && (
+        <View style={styles.moodLabel}>
+          <Text style={styles.moodText}>{moods[activeMoodIndex]?.toUpperCase()}</Text>
+        </View>
+      )}
       <PagerView
         ref={pagerRef}
         style={styles.pagerView}
         initialPage={0}
         onPageSelected={(e) => setActiveMoodIndex(e.nativeEvent.position)}
       >
-        {reelsByMood.map((moodItem, index) => (
-          <View key={moodItem.mood} style={styles.page}>
-            {renderReels(moodItem.reels, index)}
+        {moods.map((mood) => (
+          <View key={mood} style={styles.page}>
+            {renderReels(mood)}
           </View>
         ))}
       </PagerView>
@@ -139,16 +160,9 @@ const MoodPagerScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  pagerView: {
-    flex: 1,
-  },
-  page: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: 'black' },
+  pagerView: { flex: 1 },
+  page: { flex: 1 },
   moodLabel: {
     position: 'absolute',
     top: 50,

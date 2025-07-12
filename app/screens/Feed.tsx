@@ -2,6 +2,8 @@ import React from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/PostReelsStack';
+import PostStack from '../navigation/PostReelsStack';
+
 import {
   View,
   Text,
@@ -70,7 +72,7 @@ const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(
       {/* Header */}
          <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.navigate('PostReels')}>
-          <Icon name="add-circle-outline" size={28} color="#fff" style={{ position: 'absolute', right:135 }} />
+          <Icon name="add-circle-outline" size={28} color="#fff" style={{ position: 'absolute', right:135}} />
         </TouchableOpacity>
         <Text style={styles.headerText}>TOUCH</Text>
       </View>
