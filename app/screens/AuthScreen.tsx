@@ -1,18 +1,27 @@
 // app/screens/AuthScreen.tsx
 import React from 'react';
-import { View, Button, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Button,
+  StyleSheet,
+  Text,
+  ActivityIndicator,
+} from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import ProfileScreen from './ProfileTab';
 
 export default function AuthScreen() {
   const { signInWithGoogle, loading, user } = useAuth();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleLogin = async () => {
     try {
       await signInWithGoogle();
+      // optionally: navigation.navigate("Main");
     } catch (err) {
       console.error('Google Sign-In Error:', err);
     }
@@ -28,8 +37,14 @@ export default function AuthScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Welcome to Touch</Text>
-      <Button title="Continue with Google" onPress={handleLogin} />
+      {user ? (
+        <ProfileScreen />
+      ) : (
+        <>
+          <Text style={styles.heading}>Welcome to Touch</Text>
+          <Button title="Continue with Google" onPress={handleLogin} />
+        </>
+      )}
     </View>
   );
 }

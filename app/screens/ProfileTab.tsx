@@ -10,12 +10,13 @@ import {
   ListRenderItem,
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
 
 // Define the navigation param types
 type RootStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
-  SavedReels: undefined
+  SavedReels: undefined;
 };
 
 type Post = {
@@ -35,6 +36,7 @@ const postSize = (screenWidth - gap * 4) / 3;
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
 
   const renderPost: ListRenderItem<Post> = ({ item }) => (
     <Image source={{ uri: item.image }} style={styles.postImage} />
@@ -45,9 +47,7 @@ export default function ProfileScreen() {
       {/* Top Profile Info */}
       <View style={styles.profileTop}>
         <Image
-          source={{
-            uri: 'https://photosbulk.com/wp-content/uploads/instagram-profile-picture-avatar_39.webp',
-          }}
+          source={{ uri: user?.photoURL ?? 'https://via.placeholder.com/100' }}
           style={styles.avatar}
         />
         <View style={styles.statsContainer}>
@@ -68,8 +68,10 @@ export default function ProfileScreen() {
 
       {/* Username & Bio */}
       <View style={styles.bioContainer}>
-        <Text style={styles.username}>Anonymous Owl</Text>
-        <Text style={styles.bio}>I post vibes. Just here for the feels 🦉</Text>
+       <Text style={styles.username}>{user?.displayName ?? 'Anonymous Owl'}</Text>
+        <Text style={styles.bio}>
+          {user?.email ?? 'I post vibes. Just here for the feels 🦉'}
+        </Text>
       </View>
 
       {/* Buttons */}
@@ -81,9 +83,12 @@ export default function ProfileScreen() {
           <Text style={styles.buttonText}>Edit Profile</Text>
         </TouchableOpacity>
 
-         <TouchableOpacity style = {styles.button} onPress={()=>navigation.navigate('SavedReels')}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate('SavedReels')}
+        >
           <Text style={styles.buttonText}>Your saved reels</Text>
-         </TouchableOpacity>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.button}

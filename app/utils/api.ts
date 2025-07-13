@@ -1,4 +1,3 @@
-// app/utils/api.ts
 import axios from 'axios';
 import { Comment } from '../navigation/types/Post';
 
@@ -7,6 +6,22 @@ export const API_URL = 'https://api.comeback.website';
 export const api = axios.create({
   baseURL: API_URL,
 });
+
+// 🔄 USER SYNC FOR GOOGLE LOGIN
+export const syncUser = async (userData: {
+  googleId: string;
+  name: string;
+  email: string;
+  photo: string;
+}) => {
+  try {
+    const res = await api.post('/auth/google', userData);
+    return res.data;
+  } catch (err) {
+    console.error('❌ User sync failed:', err);
+    return null;
+  }
+};
 
 // ------------------- GROUP APIs -------------------
 export const fetchJoinedGroups = (userId: string) =>
@@ -34,7 +49,6 @@ export const voteQueuePost = (postId: string) =>
 export const reportQueuePost = (postId: string) =>
   api.post(`/queue/${postId}/report`);
 
-
 // ------------------- POSTS APIs -------------------
 export const fetchGroupPosts = (groupId: string) =>
   api.get(`/posts/${groupId}/posts`);
@@ -53,8 +67,6 @@ export const fetchReplies = (commentId: string) =>
   api.get<Comment[]>(`/comments/${commentId}/replies`);
 
 // ----------- COMMENT ACTION APIs -----------
-
-//  These toggle the like/dislike state
 export const likeComment = (commentId: string, userId: string) =>
   api.post(`/comments/${commentId}/like`, { userId });
 
@@ -88,7 +100,6 @@ export const fetchReelsFeed = (mood: string, page: number, userId: string) =>
   api.get(`/api/reels/feed?mood=${mood}&page=${page}&userId=${userId}`);
 
 // ------------------- REELS APIs -------------------
-
 export const fetchReelComments = (reelId: string) =>
   api.get(`/api/reels/${reelId}/comments`);
 
