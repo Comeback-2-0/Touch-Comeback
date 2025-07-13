@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Comment } from '../navigation/types/Post';
 
-export const API_URL = 'https://api.comeback.website';
+export const API_URL = 'http://10.60.64.183:3333/api';
 
 export const api = axios.create({
   baseURL: API_URL,
