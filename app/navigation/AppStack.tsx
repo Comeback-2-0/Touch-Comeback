@@ -1,6 +1,7 @@
 // app/navigation/AppStack.tsx
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet } from 'react-native';
 import { RouteProp } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -11,11 +12,12 @@ import FontAwesome6 from 'react-native-vector-icons/FontAwesome6';
 import { PostQueueProvider } from '../context/PostQueueContext';
 
 import Feed from '../screens/Feed';
-import PostReels from '../screens/ReelScreen';
+import Reels from '../screens/ReelScreen';
 import SearchBar from '../screens/SearchBar';
 import CommunityStack from './CommunityStack';
 import ProfileStack from './ProfileStack';
 import ChatNavigator from './ChatNavigator';
+import PostReelStack from './PostReelsStack';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -27,6 +29,7 @@ export type MainTabParamList = {
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const RootStack = createNativeStackNavigator();
 
 function BottomTabNavigator() {
   return (
@@ -58,10 +61,7 @@ function BottomTabNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={Feed} />
-      <Tab.Screen name="Communities" component={CommunityStack} />
-      <Tab.Screen name="Reels" component={PostReels} />
-      <Tab.Screen name="SearchBar" component={SearchBar} />
-      <Tab.Screen name="ProfileTab" component={ProfileStack} />
+      <Tab.Screen name="Reels" component={Reels} />
       <Tab.Screen
         name="ChatTab"
         children={() => (
@@ -70,10 +70,22 @@ function BottomTabNavigator() {
           </PostQueueProvider>
         )}
       />
+      <Tab.Screen name="SearchBar" component={SearchBar} />
+      <Tab.Screen name="ProfileTab" component={ProfileStack} />
     </Tab.Navigator>
   );
 }
 
+const Stack = createNativeStackNavigator();
+
+export default function AppStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
+      <Stack.Screen name="PostReels" component={PostReelStack} />
+    </Stack.Navigator>
+  );
+}
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: 'pink',
@@ -82,9 +94,3 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
 });
-
-export default function AppStack() {
-  return (
-      <BottomTabNavigator />
-  );
-}

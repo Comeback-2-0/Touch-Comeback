@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   StyleSheet,
@@ -12,55 +12,141 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  Image,
   Share,
   Alert,
-  ScrollView,
 } from 'react-native';
-import Video, { VideoRef } from 'react-native-video';
+import Video, {VideoRef} from 'react-native-video';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {
+  fetchReelComments,
+  addReelComment,
+  likeReel,
+  saveReel,
+  reportReel,
+  sendWatchTime,
+} from '../utils/api';
 
 interface Props {
+  id: string;
   uri: string;
   isActive: boolean;
   caption?: string;
+  mood?: string;
+  hashtags?: string[];
+  creatorId?: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  createdAt?: string;
+  reelId: string;
+  userId: string;
   user?: {
     username: string;
     profilePic: string;
   };
 }
 
+interface Comment {
+  _id: string;
+  text: string;
+  userId: {
+    username: string;
+    //profilePic: string;
+  };
+}
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
-const ReelCard: React.FC<Props> = ({ uri, isActive, caption, user }) => {
+const ReelCard: React.FC<Props> = ({
+  id,
+  uri,
+  isActive,
+  caption,
+  mood,
+  hashtags = [],
+  creatorId,
+  likes = 0,
+  comments = 0,
+  shares = 0,
+  saves = 0,
+  createdAt,
+  reelId,
+  userId,
+  user,
+}) => {
+  if (!uri) {
+    console.warn('Empty video URL received');
+    return <Text style={{color: 'white'}}>Video not available</Text>;
+  }
+
   const videoRef = useRef<VideoRef>(null);
   const [saved, setSaved] = useState(false);
+  const [videoKey, setVideoKey] = useState(0);
   const [paused, setPaused] = useState(!isActive);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(120);
+  const [likeCount, setLikeCount] = useState(likes);
+  const [commentCount, setCommentCount] = useState(comments);
+  const [shareCount, setShareCount] = useState(shares);
+  const [saveCount, setSaveCount] = useState(saves);
   const [showComments, setShowComments] = useState(false);
   const [commentInput, setCommentInput] = useState('');
-  const [comments, setComments] = useState([
-    { id: '1', text: '🔥🔥🔥' },
-    { id: '2', text: 'Cool reel!' },
-    { id: '3', text: 'Awesome vibes' },
-    { id: '4', text: 'Hello Bunti, Tera sabun slow hai kya' },
-  ]);
-
+  const [fetchedComments, setFetchedComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(0);
- 
 
   useEffect(() => {
     setPaused(!isActive);
+
+    if (isActive) {
+      setVideoKey(prev => prev + 1); // force remount on active change
+    }
   }, [isActive]);
 
-  const handleLike = () => {
-    const updated = !liked;
-    setLiked(updated);
-    setLikeCount((prev) => prev + (updated ? 1 : -1));
+
+  useEffect(() => {
+    const fetchComments = async () => {
+      try {
+        const res = await fetchReelComments(reelId);
+        setFetchedComments(res.data.comments);
+      } catch (err) {
+        console.error('Failed to fetch comments:', err);
+      }
+    };
+
+    if (showComments) fetchComments();
+  }, [showComments, reelId]);
+
+  useEffect(() => {
+    let watchStartTime: number;
+
+    if (isActive) {
+      watchStartTime = Date.now();
+    }
+
+    return () => {
+      if (isActive && userId && reelId) {
+        const duration = Math.floor((Date.now() - watchStartTime) / 1000);
+        const moodStr = Array.isArray(mood) ? mood[0] : mood;
+        if (!moodStr || duration <= 1) return;
+
+        sendWatchTime(reelId, userId, moodStr, duration).catch(err =>
+          console.error('Failed to send watch time:', err),
+        );
+      }
+    };
+  }, [isActive]);
+
+  const handleLike = async () => {
+    try {
+      await likeReel(reelId, userId);
+      setLiked(!liked);
+      setLikeCount(prev => (liked ? prev - 1 : prev + 1));
+    } catch (error) {
+      console.error('Error liking the reel', error);
+    }
   };
 
   const handleDoubleTap = () => {
@@ -90,157 +176,180 @@ const ReelCard: React.FC<Props> = ({ uri, isActive, caption, user }) => {
     lastTap.current = now;
   };
 
-  const handleAddComment = () => {
-    if (commentInput.trim()) {
-      setComments([{ id: Date.now().toString(), text: commentInput }, ...comments]);
+  const handleAddComment = async () => {
+    try {
+      const res = await addReelComment(reelId, userId, commentInput);
+      setFetchedComments(prev => [res.data.comment, ...prev]);
       setCommentInput('');
+      setCommentCount(prev => prev + 1);
+    } catch (err) {
+      console.error('Failed to post comment:', err);
+      Alert.alert('Error', 'Could not post comment.');
     }
   };
 
   const handleShare = async () => {
     try {
       const message = `🔥 Watch this reel on Touch:\n\n${uri}`;
-      await Share.share({ message });
+      await Share.share({message});
     } catch (error) {
       Alert.alert('Sharing Failed', 'Unable to share the reel.');
     }
   };
 
-  const handleSave = () => {
-  setSaved((prev) => !prev);
-};
+  const handleSave = async () => {
+    try {
+      await saveReel(reelId, userId);
+      setSaved(!saved);
+      setSaveCount(prev => (saved ? prev - 1 : prev + 1));
+    } catch (error) {
+      console.error('Error saving the reel', error);
+    }
+  };
 
-const handleReport = () => {
-  Alert.alert(
-    'Report Reel',
-    'Are you sure you want to report this reel?',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Report', onPress: () => Alert.alert('Reel reported. Thank you!') },
-    ],
-    { cancelable: true }
-  );
-};
+  const handleReport = () => {
+    Alert.alert('Report Reel', 'Are you sure you want to report this reel?', [
+      {text: 'Cancel', style: 'cancel'},
+      {text: 'Report', onPress: () => Alert.alert('Reel reported. Thank you!')},
+    ]);
+  };
+
+  const formattedHashtags = hashtags.map(tag => `#${tag}`).join(' ');
+  const checkBackground = uri.toLowerCase().includes('white'); // naive check
+  const textColor = checkBackground ? 'black' : 'white';
 
   return (
     <View style={styles.container}>
-      {/* Tap to Play/Pause & Like */}
       <TouchableWithoutFeedback onPress={handleTap}>
         <View style={styles.videoWrapper}>
-          <Video
-            ref={videoRef}
-            source={{ uri }}
-            style={styles.video}
-            resizeMode="cover"
-            repeat
-            paused={paused}
-            muted={muted}
-          />
-
-          {paused && (
-            <Icon name="play-circle-outline" size={60} color="white" style={styles.playIcon} />
+          {isActive && (
+            <Video
+              ref={videoRef}
+              source={{uri}}
+              onError={e => {
+                console.log('❌ Video error:', e);
+                console.log('📹 Video URI:', uri);
+              }}
+              style={styles.video}
+              resizeMode="cover"
+              repeat
+              paused={paused}
+              muted={muted}
+            />
           )}
 
-          <Animated.View style={[styles.heartOverlay, { transform: [{ scale: scaleAnim }] }]}>
+          {paused && (
+            <Icon
+              name="play-circle-outline"
+              size={60}
+              color="white"
+              style={styles.playIcon}
+            />
+          )}
+
+          <Animated.View
+            style={[styles.heartOverlay, {transform: [{scale: scaleAnim}]}]}>
             <Icon name="heart" size={100} color="white" />
           </Animated.View>
         </View>
       </TouchableWithoutFeedback>
 
-      {/* Profile Info */}
-      {/* {user && (
-        <View style={styles.profileInfo}>
-          <Image source={{ uri: user.profilePic }} style={styles.profilePic} />
-          <Text style={styles.usernameText}>@{user.username}</Text>
-        </View>
-      )} */}
-
-      {/* Mute/Unmute */}
-      <TouchableOpacity onPress={() => setMuted(!muted)} style={styles.muteToggle}>
-        <Icon name={muted ? 'volume-mute' : 'volume-high'} size={26} color="white" />
+      <TouchableOpacity
+        onPress={() => setMuted(!muted)}
+        style={styles.muteToggle}>
+        <Icon
+          name={muted ? 'volume-mute' : 'volume-high'}
+          size={26}
+          color="white"
+        />
       </TouchableOpacity>
 
-      {/* Right-side Actions */}
       <View style={styles.actions}>
-  <TouchableOpacity onPress={handleLike} style={{ alignItems: 'center' }}>
-    <Icon name={liked ? 'heart' : 'heart-outline'} size={28} color={liked ? 'red' : 'white'} />
-    <Text style={styles.actionLabel}>{likeCount}</Text>
-  </TouchableOpacity>
+        <TouchableOpacity onPress={handleLike} style={{alignItems: 'center'}}>
+          <Icon
+            name={liked ? 'heart' : 'heart-outline'}
+            size={28}
+            color={liked ? 'red' : 'white'}
+          />
+          <Text style={styles.actionLabel}>{likeCount}</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={() => setShowComments(true)} style={{ alignItems: 'center' }}>
-    <Icon name="chatbubble-outline" size={28} color="white" />
-    <Text style={styles.actionLabel}>{comments.length}</Text>
-  </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setShowComments(true)}
+          style={{alignItems: 'center'}}>
+          <Icon name="chatbubble-outline" size={28} color="white" />
+          <Text style={styles.actionLabel}>{commentCount}</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={handleShare} style={{ alignItems: 'center' }}>
-    <Icon name="share-social-outline" size={28} color="white" />
-  </TouchableOpacity>
+        <TouchableOpacity onPress={handleShare} style={{alignItems: 'center'}}>
+          <Icon name="share-social-outline" size={28} color="white" />
+          <Text style={styles.actionLabel}>{shareCount}</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={handleSave} style={{ alignItems: 'center' }}>
-    <Icon name={saved ? 'bookmark' : 'bookmark-outline'} size={26} color="white" />
-    <Text style={styles.actionLabel}>{saved ? 'Saved' : 'Save'}</Text>
-  </TouchableOpacity>
+        <TouchableOpacity onPress={handleSave} style={{alignItems: 'center'}}>
+          <Icon
+            name={saved ? 'bookmark' : 'bookmark-outline'}
+            size={26}
+            color="white"
+          />
+          <Text style={styles.actionLabel}>{saveCount}</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity onPress={handleReport} style={{ alignItems: 'center' }}>
-    <Icon name="flag-outline" size={26} color="white" />
-    <Text style={styles.actionLabel}>Report</Text>
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity onPress={handleReport} style={{alignItems: 'center'}}>
+          <Icon name="flag-outline" size={26} color="white" />
+          <Text style={styles.actionLabel}>Report</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Bottom Caption */}
+      {showComments && (
+        <FlatList
+          data={fetchedComments}
+          keyExtractor={item => item._id}
+          renderItem={({item}) => (
+            <View style={styles.commentContainer}>
+              <Text style={styles.username}>{item.userId.username}:</Text>
+              <Text style={styles.commentText}>{item.text}</Text>
+            </View>
+          )}
+        />
+      )}
+
       <View style={styles.bottomInfo}>
-  {user && (
-    <View style={styles.bottomUserRow}>
-      <Image source={{ uri: user.profilePic }} style={styles.profilePicSmall} />
-      <Text style={styles.usernameBottomText}>@{user.username}</Text>
-    </View>
-  )}
-  <Text style={styles.captionText}>{caption || '🎬 A cool reel!'}</Text>
+        {creatorId && (
+          <Text style={{color: 'white', fontSize: 14}}>{creatorId}</Text>
+        )}
+        {caption && <Text style={styles.captionText}>{caption}</Text>}
+        {hashtags.length > 0 && (
+          <Text style={{color: 'white', marginTop: 4}}>
+            {formattedHashtags}
+          </Text>
+        )}
+      </View>
 
-  <View style={styles.musicRow}>
-    <Icon name="musical-notes" size={14} color="white" />
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <Text style={styles.musicText}>
-        Original sound • @{user?.username || 'touch_user'} 🎵🔥🔥🔥
-      </Text>
-    </ScrollView>
-  </View>
-</View>
-
-
-      {/* Comment Modal */}
       <Modal
         visible={showComments}
         animationType="slide"
         onRequestClose={() => setShowComments(false)}
-        transparent
-      >
+        transparent>
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Comments</Text>
-              <TouchableOpacity onPress={() => setShowComments(false)}>
-                <Icon name="close" size={24} color="black" />
-              </TouchableOpacity>
-            </View>
-
             <FlatList
-              data={comments}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <Text style={styles.commentText}>• {item.text}</Text>}
-              style={{ flex: 1 }}
+              data={fetchedComments}
+              keyExtractor={item => item._id}
+              renderItem={({item}) => (
+                <Text style={styles.commentText}>
+                  {item.userId.username} : {item.text}
+                </Text>
+              )}
+              style={{flex: 1}}
             />
-
             <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={100}
-            >
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
               <View style={styles.inputContainer}>
                 <TextInput
                   value={commentInput}
                   onChangeText={setCommentInput}
                   placeholder="Add a comment..."
-                  placeholderTextColor="gray"
                   style={styles.textInput}
                 />
                 <TouchableOpacity onPress={handleAddComment}>
@@ -255,12 +364,20 @@ const handleReport = () => {
   );
 };
 
+export default ReelCard;
+
 const styles = StyleSheet.create({
-  container: { width, height, backgroundColor: 'black', position: 'relative' },
-  videoWrapper: { flex: 1 },
-  video: { position: 'absolute', width: '100%', height: '100%' },
-  playIcon: { position: 'absolute', top: '45%', left: '45%', zIndex: 2 },
-  heartOverlay: { position: 'absolute', top: '40%', left: '40%', opacity: 0.8, zIndex: 5 },
+  container: {width, height, backgroundColor: 'black', position: 'relative'},
+  videoWrapper: {flex: 1},
+  video: {position: 'absolute', width: '100%', height: '100%'},
+  playIcon: {position: 'absolute', top: '45%', left: '45%', zIndex: 2},
+  heartOverlay: {
+    position: 'absolute',
+    top: '40%',
+    left: '40%',
+    opacity: 0.8,
+    zIndex: 5,
+  },
   muteToggle: {
     position: 'absolute',
     top: 60,
@@ -269,6 +386,15 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     zIndex: 10,
+  },
+  commentContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  username: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   actions: {
     position: 'absolute',
@@ -289,25 +415,25 @@ const styles = StyleSheet.create({
     right: 16,
   },
   bottomUserRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 6,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
 
-profilePicSmall: {
-  width: 28,
-  height: 28,
-  borderRadius: 14,
-  marginRight: 8,
-  borderWidth: 1,
-  borderColor: '#fff',
-},
+  profilePicSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
 
-usernameBottomText: {
-  color: 'white',
-  fontSize: 14,
-  fontWeight: '600',
-},
+  usernameBottomText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 
   captionText: {
     color: 'white',
@@ -335,12 +461,10 @@ usernameBottomText: {
     borderRadius: 20,
   },
   profilePic: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#fff',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
   },
   usernameText: {
     color: 'white',
@@ -397,5 +521,3 @@ usernameBottomText: {
     fontSize: 16,
   },
 });
-
-export default ReelCard;

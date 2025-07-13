@@ -15,6 +15,7 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 type RootStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
+  SavedReels: undefined
 };
 
 type Post = {
@@ -79,6 +80,11 @@ export default function ProfileScreen() {
         >
           <Text style={styles.buttonText}>Edit Profile</Text>
         </TouchableOpacity>
+
+         <TouchableOpacity style = {styles.button} onPress={()=>navigation.navigate('SavedReels')}>
+          <Text style={styles.buttonText}>Your saved reels</Text>
+         </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.navigate('Settings')}

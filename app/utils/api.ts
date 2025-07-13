@@ -1,3 +1,4 @@
+// app/utils/api.ts
 import axios from 'axios';
 import { Comment } from '../navigation/types/Post';
 
@@ -72,3 +73,36 @@ export const uploadPost = async (formData: FormData) =>
       'Content-Type': 'multipart/form-data',
     },
   });
+
+export const uploadReel = (formData: FormData) =>
+  api.post('/api/reels/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+export const fetchReelMoods = (userId: string) =>
+  api.get(`/api/reels/moods?userId=${userId}`);
+
+export const fetchReelsFeed = (mood: string, page: number, userId: string) =>
+  api.get(`/api/reels/feed?mood=${mood}&page=${page}&userId=${userId}`);
+
+// ------------------- REELS APIs -------------------
+
+export const fetchReelComments = (reelId: string) =>
+  api.get(`/api/reels/${reelId}/comments`);
+
+export const addReelComment = (reelId: string, userId: string, text: string) =>
+  api.post(`/api/reels/${reelId}/comments`, { reelId, userId, text });
+
+export const likeReel = (reelId: string, userId: string) =>
+  api.post(`/api/reels/like`, { reelId, userId });
+
+export const saveReel = (reelId: string, userId: string) =>
+  api.post(`/api/reels/save`, { reelId, userId });
+
+export const reportReel = (reelId: string, userId: string) =>
+  api.post(`/api/reels/report`, { reelId, userId });
+
+export const sendWatchTime = (reelId: string, userId: string, mood: string, duration: number) =>
+  api.post(`/api/reels/watch`, { reelId, userId, mood, duration });
