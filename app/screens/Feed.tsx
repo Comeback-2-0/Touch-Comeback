@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/PostReelsStack';
 import {
   View,
   Text,
@@ -12,6 +11,13 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+
+type AppStackParamList = {
+  MainTabs: undefined;
+  ReelNavigator: undefined;
+};
+
+type ReelNavigationProp = NativeStackNavigationProp<AppStackParamList, 'MainTabs'>;
 
 const avatarUri =
   'https://photosbulk.com/wp-content/uploads/instagram-profile-picture-avatar_39.webp';
@@ -25,9 +31,8 @@ type StoryUser = {
 };
 
 export default function FeedScreen(): JSX.Element {
-const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  const storyUsers: StoryUser[] = Array(8)
+   const navigation = useNavigation<ReelNavigationProp>();
+   const storyUsers: StoryUser[] = Array(8)
     .fill(null)
     .map((_, index) => ({
       id: index.toString(),
@@ -69,9 +74,10 @@ const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(
     <ScrollView style={styles.container}>
       {/* Header */}
          <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.navigate('PostReels')}>
-          <Icon name="add-circle-outline" size={28} color="#fff" style={{ position: 'absolute', right:135 }} />
-        </TouchableOpacity>
+  <TouchableOpacity onPress={() => navigation.navigate('ReelNavigator')}>
+    <Icon name="add-circle-outline" size={28} color="#fff" style={{ position: 'absolute', right: 135 }} />
+  </TouchableOpacity>
+
         <Text style={styles.headerText}>TOUCH</Text>
       </View>
 

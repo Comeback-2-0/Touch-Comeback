@@ -1,4 +1,5 @@
 // App.tsx
+import 'react-native-reanimated';
 import React from 'react';
 import './app/utils/googleConfig';
 import { NavigationContainer } from '@react-navigation/native';

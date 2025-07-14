@@ -2,7 +2,7 @@ buildscript {
     ext {
         buildToolsVersion = "35.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 35
+        compileSdkVersion = 36
         targetSdkVersion = 34
         ndkVersion = "26.1.10909125"
         kotlinVersion = "1.9.24"
@@ -10,9 +10,11 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        jcenter() // Make sure this is included for compatibility
+        maven { url 'https://jitpack.io' }
     }
     dependencies {
-        classpath("com.android.tools.build:gradle")
+        classpath("com.android.tools.build:gradle:8.9.1") 
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
         classpath("com.google.gms:google-services:4.4.2")
@@ -20,3 +22,9 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+configurations.all {
+    resolutionStrategy {
+        force 'com.margelo.nitro:react-native-nitro-modules:1.0.0' // This ensures Gradle uses a compatible version
+    }
+}
