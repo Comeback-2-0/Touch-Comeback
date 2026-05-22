@@ -2,7 +2,8 @@
 import axios from 'axios';
 import { Comment } from '../navigation/types/Post';
 
-export const API_URL = 'https://api.comeback.website';
+export const API_URL = 'https://api.touchapp.me';
+// export const API_URL = 'https://api.comeback.website';
 
 export const api = axios.create({
   baseURL: API_URL,

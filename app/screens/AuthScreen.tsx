@@ -2,13 +2,9 @@
 import React from 'react';
 import { View, Button, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/RootNavigator';
 
 export default function AuthScreen() {
-  const { signInWithGoogle, loading, user } = useAuth();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { signInWithGoogle, loading } = useAuth();
 
   const handleLogin = async () => {
     try {
