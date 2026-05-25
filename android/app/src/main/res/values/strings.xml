@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Touch</string>
-    <string name="splash_logo_description">Todo</string>
+    <string name="splash_logo_description">Touch app icon</string>
+    <string name="splash_made_with">Made with</string>
+    <string name="splash_by">by</string>
+    <string name="splash_creator_name">IJ Roy</string>
 </resources>

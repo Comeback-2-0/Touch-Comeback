@@ -13,6 +13,7 @@ import {
   getAuthTokens,
   saveAuthTokens,
 } from '../utils/authTokenStorage';
+import {createAuthFlowError} from '../utils/authErrors';
 
 export type BackendUser = {
   _id: string;
@@ -85,6 +86,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       setUser(response.data.user);
     } catch (error) {
       console.error('Google Sign-In Error:', error);
+      throw createAuthFlowError(error);
     }
   };
 

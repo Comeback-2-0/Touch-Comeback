@@ -22,12 +22,10 @@ class MainActivity : ReactActivity() {
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
 
-//    override fun onCreate(savedInstanceState: Bundle?) {
-//        SplashScreen.show(this) // Show the splash screen
-//        super.onCreate(savedInstanceState)
-//
-//        // Set the theme back to AppTheme after the splash screen
-//        setTheme(R.style.AppTheme)
-//    }
+  override fun onCreate(savedInstanceState: Bundle?) {
+    SplashScreen.show(this)
+    setTheme(R.style.AppTheme)
+    super.onCreate(savedInstanceState)
+  }
 
 }
