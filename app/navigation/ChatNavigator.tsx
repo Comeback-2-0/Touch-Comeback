@@ -10,15 +10,12 @@ export type ChatStackParamList = {
   GroupListScreen: undefined;
   GroupChatScreen: {
     group: { id: string; name: string; members: number };
-    userId: string;
   };
   CreatePostScreen: {
     group: { id: string; name: string; members: number };
-    userId: string;
   };
   QueueScreen: {
     group: { id: string; name: string; members: number };
-    userId: string;
   };
 };
 

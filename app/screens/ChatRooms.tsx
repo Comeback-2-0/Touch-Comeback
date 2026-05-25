@@ -8,10 +8,9 @@ import {
   StyleSheet,
 } from 'react-native';
 import io from 'socket.io-client';
-import axios from 'axios';
 import {RouteProp} from '@react-navigation/native';
 import {CommunitiesStackParamList} from '../navigation/CommunityStack';
-import {API_URL} from '../utils/api';
+import {API_URL, api} from '../utils/api';
 
 type ChatRoomRouteProp = RouteProp<CommunitiesStackParamList, 'ChatRoom'>;
 
@@ -39,7 +38,7 @@ export default function ChatRoom({route}: Props) {
   useEffect(() => {
     socket.emit('joinRoom', community._id);
 
-    axios.get(`${API_URL}/messages/${community._id}`).then(res => {
+    api.get(`/messages/${community._id}`).then(res => {
       setMessages(res.data);
     });
 
@@ -63,7 +62,7 @@ export default function ChatRoom({route}: Props) {
 
     socket.emit('sendMessage', message);
 
-    axios.post(`${API_URL}/messages`, message);
+    api.post('/messages', message);
 
     setInput('');
   };

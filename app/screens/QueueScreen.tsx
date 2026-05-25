@@ -12,17 +12,25 @@ import {
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ChatStackParamList} from '../navigation/ChatNavigator';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {fetchQueuePosts, API_URL} from '../utils/api';
+import {
+  fetchQueuePosts,
+  reportQueuePost,
+  undoReportQueuePost,
+  voteQueuePost,
+} from '../utils/api';
+import {useAuth} from '../context/AuthContext';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'QueueScreen'>;
 
 export default function QueueScreen({navigation, route}: Props) {
-  const {group, userId} = route.params;
+  const {group} = route.params;
+  const {user} = useAuth();
+  const userId = user?._id ?? '';
   const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const goToCreatePost = () => {
-    navigation.navigate('CreatePostScreen', {group, userId});
+    navigation.navigate('CreatePostScreen', {group});
   };
 
   const voteOnPost = async (postId: string) => {
@@ -30,11 +38,7 @@ export default function QueueScreen({navigation, route}: Props) {
     const hasVoted = post?.votedBy?.includes(userId);
 
     try {
-      await fetch(`${API_URL}/queue/${postId}/vote`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({userId}),
-      });
+      await voteQueuePost(postId);
 
       setQueue(prev =>
         prev.map(p =>
@@ -56,11 +60,7 @@ export default function QueueScreen({navigation, route}: Props) {
 
   const reportPost = async (postId: string) => {
     try {
-      await fetch(`${API_URL}/queue/${postId}/report`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({userId}),
-      });
+      await reportQueuePost(postId);
       setQueue(prev =>
         prev.map(p =>
           p._id === postId
@@ -78,11 +78,7 @@ export default function QueueScreen({navigation, route}: Props) {
 
   const undoReportPost = async (postId: string) => {
     try {
-      await fetch(`${API_URL}/queue/${postId}/unreport`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({userId}),
-      });
+      await undoReportQueuePost(postId);
 
       setQueue(prev =>
         prev.map(p =>
@@ -102,7 +98,7 @@ export default function QueueScreen({navigation, route}: Props) {
   useEffect(() => {
     const loadQueue = async () => {
       try {
-        const res = await fetchQueuePosts(group.id, userId);
+        const res = await fetchQueuePosts(group.id);
         setQueue(res.data);
       } catch (err) {
         console.error('Failed to load queue:', err);

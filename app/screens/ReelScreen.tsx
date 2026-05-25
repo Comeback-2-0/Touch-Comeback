@@ -12,10 +12,8 @@ import {
 import {fetchReelMoods, fetchReelsFeed} from '../utils/api';
 import PagerView from 'react-native-pager-view';
 import ReelCard from '../components/ReelCard';
-import { getAuth } from '@react-native-firebase/auth';
 
 const {height} = Dimensions.get('window');
-const userId = getAuth().currentUser?.uid || '';
 
 type Reel = {
   _id: string;
@@ -45,7 +43,7 @@ const MoodPagerScreen = () => {
   useEffect(() => {
     const fetchMoods = async () => {
       try {
-        const response = await fetchReelMoods(userId);
+        const response = await fetchReelMoods();
         setMoods(response.data);
       } catch (error) {
         console.error('Failed to fetch moods:', error);
@@ -62,7 +60,7 @@ const MoodPagerScreen = () => {
 
   const fetchReelsForMood = async (mood: string, page: number) => {
     try {
-      const response = await fetchReelsFeed(mood, page, userId);
+      const response = await fetchReelsFeed(mood, page);
       setReelsByMood(prev => ({
         ...prev,
         [mood]:
@@ -120,7 +118,6 @@ const MoodPagerScreen = () => {
               shares={item.shares}
               saves={item.saves}
               createdAt={item.createdAt}
-              userId={userId}
             />
           );
         }}

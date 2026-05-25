@@ -1,17 +1,66 @@
 // app/utils/api.ts
 import axios from 'axios';
 import { Comment } from '../navigation/types/Post';
+import {
+  clearAuthTokens,
+  getAuthTokens,
+  saveAuthTokens,
+} from './authTokenStorage';
 
-export const API_URL = 'https://api.touchapp.me';
-// export const API_URL = 'https://api.comeback.website';
+// export const API_URL = 'https://api.touchapp.me';
+export const API_URL = 'https://api.comeback.website';
 
 export const api = axios.create({
   baseURL: API_URL,
 });
 
+let authFailureHandler: (() => void) | null = null;
+
+export const setAuthFailureHandler = (handler: (() => void) | null) => {
+  authFailureHandler = handler;
+};
+
+api.interceptors.request.use(async config => {
+  const tokens = await getAuthTokens();
+  if (tokens?.accessToken) {
+    config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  response => response,
+  async error => {
+    const originalRequest = error.config;
+
+    if (error.response?.status !== 401 || originalRequest?._retry) {
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    try {
+      const tokens = await getAuthTokens();
+      if (!tokens?.refreshToken) throw new Error('Missing refresh token');
+
+      const response = await axios.post(`${API_URL}/auth/refresh`, {
+        refreshToken: tokens.refreshToken,
+      });
+
+      await saveAuthTokens(response.data);
+      originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      await clearAuthTokens();
+      authFailureHandler?.();
+      return Promise.reject(refreshError);
+    }
+  },
+);
+
 // ------------------- GROUP APIs -------------------
-export const fetchJoinedGroups = (userId: string) =>
-  api.get(`/groups/joined/${userId}`);
+export const fetchJoinedGroups = () =>
+  api.get('/groups/joined/me');
 
 export const fetchTrendingGroups = () =>
   api.get('/groups/trending');
@@ -19,12 +68,12 @@ export const fetchTrendingGroups = () =>
 export const searchGroups = (query: string) =>
   api.get(`/groups/search?query=${query}`);
 
-export const joinGroup = (groupId: string, userId: string) =>
-  api.post(`/groups/${groupId}/join`, { userId });
+export const joinGroup = (groupId: string) =>
+  api.post(`/groups/${groupId}/join`);
 
 // ------------------- QUEUE APIs -------------------
-export const fetchQueuePosts = (groupId: string, userId: string) =>
-  api.get(`/queue/${groupId}?userId=${userId}`);
+export const fetchQueuePosts = (groupId: string) =>
+  api.get(`/queue/${groupId}`);
 
 export const createQueuePost = (groupId: string, content: string) =>
   api.post(`/queue/${groupId}`, { content });
@@ -35,19 +84,22 @@ export const voteQueuePost = (postId: string) =>
 export const reportQueuePost = (postId: string) =>
   api.post(`/queue/${postId}/report`);
 
+export const undoReportQueuePost = (postId: string) =>
+  api.post(`/queue/${postId}/unreport`);
+
 
 // ------------------- POSTS APIs -------------------
 export const fetchGroupPosts = (groupId: string) =>
   api.get(`/posts/${groupId}/posts`);
 
-export const likePost = (postId: string, userId: string) =>
-  api.post(`/posts/${postId}/like`, { userId });
+export const likePost = (postId: string) =>
+  api.post(`/posts/${postId}/like`);
 
-export const dislikePost = (postId: string, userId: string) =>
-  api.post(`/posts/${postId}/dislike`, { userId });
+export const dislikePost = (postId: string) =>
+  api.post(`/posts/${postId}/dislike`);
 
-export const commentOnPost = (postId: string, text: string, userId: string) =>
-  api.post(`/posts/${postId}/comment`, { text, userId });
+export const commentOnPost = (postId: string, text: string) =>
+  api.post(`/posts/${postId}/comment`, { text });
 
 // ------------------- REPLIES API -------------------
 export const fetchReplies = (commentId: string) =>
@@ -56,17 +108,17 @@ export const fetchReplies = (commentId: string) =>
 // ----------- COMMENT ACTION APIs -----------
 
 //  These toggle the like/dislike state
-export const likeComment = (commentId: string, userId: string) =>
-  api.post(`/comments/${commentId}/like`, { userId });
+export const likeComment = (commentId: string) =>
+  api.post(`/comments/${commentId}/like`);
 
-export const dislikeComment = (commentId: string, userId: string) =>
-  api.post(`/comments/${commentId}/dislike`, { userId });
+export const dislikeComment = (commentId: string) =>
+  api.post(`/comments/${commentId}/dislike`);
 
-export const reportComment = (commentId: string, userId: string) =>
-  api.post(`/comments/${commentId}/report`, { userId });
+export const reportComment = (commentId: string) =>
+  api.post(`/comments/${commentId}/report`);
 
-export const replyToComment = (commentId: string, text: string, userId: string) =>
-  api.post(`/comments/${commentId}/replies`, { text, userId });
+export const replyToComment = (commentId: string, text: string) =>
+  api.post(`/comments/${commentId}/replies`, { text });
 
 export const uploadPost = async (formData: FormData) =>
   api.post('/posts/create', formData, {
@@ -82,28 +134,28 @@ export const uploadReel = (formData: FormData) =>
     },
   });
 
-export const fetchReelMoods = (userId: string) =>
-  api.get(`/api/reels/moods?userId=${userId}`);
+export const fetchReelMoods = () =>
+  api.get('/api/reels/moods');
 
-export const fetchReelsFeed = (mood: string, page: number, userId: string) =>
-  api.get(`/api/reels/feed?mood=${mood}&page=${page}&userId=${userId}`);
+export const fetchReelsFeed = (mood: string, page: number) =>
+  api.get(`/api/reels/feed?mood=${mood}&page=${page}`);
 
 // ------------------- REELS APIs -------------------
 
 export const fetchReelComments = (reelId: string) =>
   api.get(`/api/reels/${reelId}/comments`);
 
-export const addReelComment = (reelId: string, userId: string, text: string) =>
-  api.post(`/api/reels/${reelId}/comments`, { reelId, userId, text });
+export const addReelComment = (reelId: string, text: string) =>
+  api.post(`/api/reels/${reelId}/comments`, { reelId, text });
 
-export const likeReel = (reelId: string, userId: string) =>
-  api.post(`/api/reels/like`, { reelId, userId });
+export const likeReel = (reelId: string) =>
+  api.post('/api/reels/like', { reelId });
 
-export const saveReel = (reelId: string, userId: string) =>
-  api.post(`/api/reels/save`, { reelId, userId });
+export const saveReel = (reelId: string) =>
+  api.post('/api/reels/save', { reelId });
 
-export const reportReel = (reelId: string, userId: string) =>
-  api.post(`/api/reels/report`, { reelId, userId });
+export const reportReel = (reelId: string) =>
+  api.post('/api/reels/report', { reelId });
 
-export const sendWatchTime = (reelId: string, userId: string, mood: string, duration: number) =>
-  api.post(`/api/reels/watch`, { reelId, userId, mood, duration });
+export const sendWatchTime = (reelId: string, mood: string, duration: number) =>
+  api.post('/api/reels/watch', { reelId, mood, duration });

@@ -34,7 +34,7 @@ type Group = {
 
 export default function GroupListScreen({navigation}: Props) {
   const {user, loading} = useAuth();
-  const userId = user?.uid ?? '';
+  const userId = user?._id ?? '';
   const [joinedGroups, setJoinedGroups] = useState<Group[]>([]);
   const [trendingGroups, setTrendingGroups] = useState<Group[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,7 +47,7 @@ export default function GroupListScreen({navigation}: Props) {
 
     const loadGroups = async () => {
       try {
-        const joinedRes = await fetchJoinedGroups(userId);
+        const joinedRes = await fetchJoinedGroups();
         const trendingRes = await fetchTrendingGroups();
         setJoinedGroups(joinedRes.data);
         setTrendingGroups(trendingRes.data);
@@ -70,8 +70,8 @@ export default function GroupListScreen({navigation}: Props) {
 
   const handleJoin = async (groupId: string) => {
     try {
-      await joinGroup(groupId, userId);
-      const joinedRes = await fetchJoinedGroups(userId);
+      await joinGroup(groupId);
+      const joinedRes = await fetchJoinedGroups();
       setJoinedGroups(joinedRes.data);
     } catch (err) {
       console.error('Join failed:', err);
@@ -94,7 +94,6 @@ export default function GroupListScreen({navigation}: Props) {
               name: group.name,
               members: group.members.length,
             },
-            userId,
           });
         } else {
           setSelectedGroup(group);

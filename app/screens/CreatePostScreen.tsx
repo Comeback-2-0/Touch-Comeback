@@ -29,7 +29,7 @@ export default function CreatePostScreen({route, navigation}: Props) {
   const [text, setText] = useState('');
   const [image, setImage] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(false);
-  const {group, userId} = route.params;
+  const {group} = route.params;
 
   const requestPermissions = async () => {
     if (Platform.OS === 'android') {

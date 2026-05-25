@@ -12,7 +12,6 @@ import {
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import { uploadReel } from '../utils/api';
 import Video from 'react-native-video';
-import { getAuth } from '@react-native-firebase/auth';
 import Icon from 'react-native-vector-icons/Feather';
 
 const PostReelScreen = () => {
@@ -21,7 +20,6 @@ const PostReelScreen = () => {
   const [mood, setMood] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [uploading, setUploading] = useState(false);
-  const userId = getAuth().currentUser?.uid;
 
 
   const formatHashtags = (text: string) =>
@@ -48,7 +46,7 @@ const PostReelScreen = () => {
   };
 
   const handleUpload = async () => {
-    if (!videoAsset || !caption || !mood || !userId) {
+    if (!videoAsset || !caption || !mood) {
       return Alert.alert('Missing info', 'Please select a video, caption, and mood.');
     }
 
@@ -63,7 +61,6 @@ const PostReelScreen = () => {
       });
       formData.append('caption', caption);
       formData.append('mood', mood);
-      formData.append('creatorId', userId);
       formData.append('hashtags', formatHashtags(hashtags));
 
       await uploadReel(formData);

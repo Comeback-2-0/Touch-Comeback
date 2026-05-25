@@ -20,12 +20,15 @@ import {
   fetchReplies,
 } from '../utils/api';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {useAuth} from '../context/AuthContext';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'GroupChatScreen'>;
 
 export default function GroupChatScreen({navigation, route}: Props) {
   const flatListRef = useRef<FlatList<Post>>(null);
-  const {group, userId} = route.params;
+  const {group} = route.params;
+  const {user} = useAuth();
+  const userId = user?._id ?? '';
   const [posts, setPosts] = useState<Post[]>([]);
   const [commentMode, setCommentMode] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -71,14 +74,12 @@ export default function GroupChatScreen({navigation, route}: Props) {
   const goToCreatePost = () => {
     navigation.navigate('CreatePostScreen', {
       group,
-      userId,
     });
   };
 
   const goToQueue = () => {
     navigation.navigate('QueueScreen', {
       group,
-      userId,
     });
   };
 
@@ -110,7 +111,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
 
   const handleLikePost = async (postId: string) => {
     try {
-      await likePost(postId, userId);
+      await likePost(postId);
       await refreshPosts(); // fetch updated post data
     } catch (e) {
       console.error('Like post failed:', e);
@@ -119,7 +120,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
 
   const handleDislikePost = async (postId: string) => {
     try {
-      await dislikePost(postId, userId);
+      await dislikePost(postId);
       await refreshPosts(); // fetch updated post data
     } catch (e) {
       console.error('Dislike post failed:', e);
@@ -128,7 +129,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
 
   const handleLikeComment = async (commentId: string) => {
     try {
-      await likeComment(commentId, userId);
+      await likeComment(commentId);
       if (!selectedPost) return;
 
       const updatedComments = selectedPost.comments.map(comment => {
@@ -161,7 +162,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
 
   const handleDislikeComment = async (commentId: string) => {
     try {
-      await dislikeComment(commentId, userId);
+      await dislikeComment(commentId);
       if (!selectedPost) return;
 
       const updatedComments = selectedPost.comments.map(comment => {
@@ -196,7 +197,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
 
   const handleReportComment = async (commentId: string) => {
     try {
-      await reportComment(commentId, userId);
+      await reportComment(commentId);
       await refreshComments(selectedPost!._id);
     } catch (e) {
       console.error('Report failed', e);
@@ -269,11 +270,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
               <CommentBox
                 onSubmit={async text => {
                   try {
-                    const res = await commentOnPost(
-                      selectedPost._id,
-                      text,
-                      userId,
-                    );
+                    const res = await commentOnPost(selectedPost._id, text);
                     const updated = {
                       ...selectedPost,
                       comments: [...selectedPost.comments, res.data],
@@ -316,7 +313,7 @@ export default function GroupChatScreen({navigation, route}: Props) {
               <CommentBox
                 placeholder="Write a reply…"
                 onSubmit={async text => {
-                  await replyToComment(selectedComment._id, text, userId);
+                  await replyToComment(selectedComment._id, text);
                   const res = await fetchReplies(selectedComment._id);
                   setReplies(res.data.reverse());
                 }}

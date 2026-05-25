@@ -40,7 +40,6 @@ interface Props {
   saves?: number;
   createdAt?: string;
   reelId: string;
-  userId: string;
   user?: {
     username: string;
     profilePic: string;
@@ -72,7 +71,6 @@ const ReelCard: React.FC<Props> = ({
   saves = 0,
   createdAt,
   reelId,
-  userId,
   user,
 }) => {
   if (!uri) {
@@ -127,12 +125,12 @@ const ReelCard: React.FC<Props> = ({
     }
 
     return () => {
-      if (isActive && userId && reelId) {
+      if (isActive && reelId) {
         const duration = Math.floor((Date.now() - watchStartTime) / 1000);
         const moodStr = Array.isArray(mood) ? mood[0] : mood;
         if (!moodStr || duration <= 1) return;
 
-        sendWatchTime(reelId, userId, moodStr, duration).catch(err =>
+        sendWatchTime(reelId, moodStr, duration).catch(err =>
           console.error('Failed to send watch time:', err),
         );
       }
@@ -141,7 +139,7 @@ const ReelCard: React.FC<Props> = ({
 
   const handleLike = async () => {
     try {
-      await likeReel(reelId, userId);
+      await likeReel(reelId);
       setLiked(!liked);
       setLikeCount(prev => (liked ? prev - 1 : prev + 1));
     } catch (error) {
@@ -178,7 +176,7 @@ const ReelCard: React.FC<Props> = ({
 
   const handleAddComment = async () => {
     try {
-      const res = await addReelComment(reelId, userId, commentInput);
+      const res = await addReelComment(reelId, commentInput);
       setFetchedComments(prev => [res.data.comment, ...prev]);
       setCommentInput('');
       setCommentCount(prev => prev + 1);
@@ -199,7 +197,7 @@ const ReelCard: React.FC<Props> = ({
 
   const handleSave = async () => {
     try {
-      await saveReel(reelId, userId);
+      await saveReel(reelId);
       setSaved(!saved);
       setSaveCount(prev => (saved ? prev - 1 : prev + 1));
     } catch (error) {

@@ -1,19 +1,30 @@
-// app/context/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {createContext, useContext, useEffect, useState} from 'react';
 import {
   getAuth,
-  onAuthStateChanged,
   signInWithCredential,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
 } from '@react-native-firebase/auth';
 import axios from 'axios';
-import { API_URL } from '../utils/api';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import {GoogleSignin} from '@react-native-google-signin/google-signin';
+import {API_URL, api, setAuthFailureHandler} from '../utils/api';
+import {
+  clearAuthTokens,
+  getAuthTokens,
+  saveAuthTokens,
+} from '../utils/authTokenStorage';
+
+export type BackendUser = {
+  _id: string;
+  uid?: string;
+  name: string;
+  email: string;
+  photo?: string;
+  role?: string;
+};
 
 interface AuthContextShape {
-  user: FirebaseAuthTypes.User | null;
+  user: BackendUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -21,44 +32,75 @@ interface AuthContextShape {
 
 const AuthContext = createContext<AuthContextShape | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
+  children,
+}) => {
   const auth = getAuth();
-  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(auth.currentUser);
+  const [user, setUser] = useState<BackendUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, u => {
-      setUser(u);
-      setLoading(false);
+    setAuthFailureHandler(() => {
+      setUser(null);
     });
-    return unsubscribe;
+
+    const restoreSession = async () => {
+      try {
+        const tokens = await getAuthTokens();
+        if (!tokens?.accessToken) return;
+
+        const response = await api.get('/auth/me');
+        setUser(response.data.user);
+      } catch (err) {
+        await clearAuthTokens();
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
+
+    return () => setAuthFailureHandler(null);
   }, []);
 
-const signInWithGoogle = async () => {
-  try {
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  const signInWithGoogle = async () => {
+    try {
+      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
 
-    const userInfo = await GoogleSignin.signIn();
-    const { idToken } = await GoogleSignin.getTokens();
+      await GoogleSignin.signIn();
+      const {idToken} = await GoogleSignin.getTokens();
 
-    if (!idToken) throw new Error('No idToken returned from Google Sign-In');
+      if (!idToken) throw new Error('No idToken returned from Google Sign-In');
 
-    const credential = GoogleAuthProvider.credential(idToken);
-    await signInWithCredential(auth, credential);
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
 
-    // Send idToken to backend
-    const response = await axios.post(`${API_URL}/auth/google`, { idToken });
+      const response = await axios.post(`${API_URL}/auth/google`, {idToken});
 
-    console.log('✅ Sent token to backend:', response.data);
-    // You can now use: response.data.user to store user in context if needed
-
-  } catch (error) {
-    console.error('Google Sign-In Error:', error);
-  }
-};
-
+      await saveAuthTokens({
+        accessToken: response.data.accessToken,
+        refreshToken: response.data.refreshToken,
+      });
+      setUser(response.data.user);
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+    }
+  };
 
   const signOut = async () => {
+    const tokens = await getAuthTokens();
+    if (tokens?.refreshToken) {
+      try {
+        await axios.post(`${API_URL}/auth/logout`, {
+          refreshToken: tokens.refreshToken,
+        });
+      } catch (err) {
+        console.error('Backend logout failed:', err);
+      }
+    }
+
+    await clearAuthTokens();
     await firebaseSignOut(auth);
     await GoogleSignin.revokeAccess();
     await GoogleSignin.signOut();
@@ -66,7 +108,7 @@ const signInWithGoogle = async () => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{user, loading, signInWithGoogle, signOut}}>
       {children}
     </AuthContext.Provider>
   );
