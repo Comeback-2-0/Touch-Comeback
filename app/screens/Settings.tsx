@@ -14,7 +14,7 @@ import {useAuth} from '../context/AuthContext';
 
 type NavigationProp = NativeStackNavigationProp<
   SettingsStackParamList,
-  'Settings'
+  'SettingsHome'
 >;
 
 type SettingItem = {

@@ -10,18 +10,7 @@ import SecurityScreen from "../screens/Security";
 import AboutTouchScreen from "../screens/AboutTouch";
 import CommunityGuidelinesScreen from "../screens/Guildelines";
 import ReportProblemScreen from "../screens/Report";
-
-export type SettingsStackParamList = {
-  Settings: undefined;
-  ChangePassword: undefined;
-  Notifications :undefined;
-  Theme :undefined;
-  BlockedAccounts:undefined;
-  Security:undefined;
-  Touch:undefined;
-  Guildlines:undefined;
-  Report:undefined;
-};
+import { SettingsStackParamList } from "./types/SettingsStackParamList";
 
 const Stack = createNativeStackNavigator<SettingsStackParamList>();
 
@@ -30,7 +19,7 @@ export default function ProfileStack() {
     <Stack.Navigator>
 
       <Stack.Screen
-        name="Settings"
+        name="SettingsHome"
         component={Settings}
         options={{ headerTitle: "Settings" }}
       />

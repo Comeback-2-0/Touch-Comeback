@@ -10,8 +10,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate('SettingsHome')} />
       <Text style={styles.title}>Theme</Text>
     </View>
   );
