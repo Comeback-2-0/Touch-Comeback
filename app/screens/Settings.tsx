@@ -10,6 +10,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {SettingsStackParamList} from '../navigation/types/SettingsStackParamList';
+import {useAuth} from '../context/AuthContext';
 
 type NavigationProp = NativeStackNavigationProp<
   SettingsStackParamList,
@@ -76,45 +77,63 @@ const settingsSections: Section[] = [
   },
 ];
 
+const settingsListData = [
+  ...settingsSections.flatMap(section => [
+    {type: 'header', title: section.title},
+    ...section.data.map(item => ({...item, type: 'item'})),
+  ]),
+  {type: 'logout', key: 'logout'},
+];
+
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const {signOut} = useAuth();
+
+  const renderLogout = () => (
+    <TouchableOpacity
+      testID="logout-button"
+      style={styles.logoutRow}
+      onPress={signOut}>
+      <Ionicons name="log-out-outline" size={20} color="#d32f2f" />
+      <Text style={styles.logoutLabel}>Log Out</Text>
+    </TouchableOpacity>
+  );
 
   const renderItem = ({item}: {item: SettingItem}) => (
     <TouchableOpacity
       style={styles.row}
       onPress={() => navigation.navigate(item.screen)}>
       <Ionicons
-        name="chevron-forward"
+        name={item.icon}
         size={18}
-        color="#888"
-        style={{marginLeft: 'auto'}}
+        color="#555"
+        style={styles.rowIcon}
       />
       <Text style={styles.label}>{item.label}</Text>
       <Ionicons
         name="chevron-forward"
         size={18}
         color="#888"
-        style={{marginLeft: 'auto'}}
+        style={styles.chevron}
       />
     </TouchableOpacity>
   );
 
   return (
     <FlatList
-      data={settingsSections.flatMap(section => [
-        {type: 'header', title: section.title},
-        ...section.data.map(item => ({...item, type: 'item'})),
-      ])}
+      data={settingsListData}
       renderItem={({item}: any) =>
         item.type === 'header' ? (
           <Text style={styles.sectionTitle}>{item.title}</Text>
+        ) : item.type === 'logout' ? (
+          renderLogout()
         ) : (
           renderItem({item})
         )
       }
       keyExtractor={(item: any) => item.key ?? item.title}
       contentContainerStyle={styles.container}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
+      ItemSeparatorComponent={SettingsSeparator}
       showsVerticalScrollIndicator={false}
       removeClippedSubviews={false}
     />
@@ -157,8 +176,30 @@ const styles = StyleSheet.create({
     marginLeft: 15,
     color: '#333',
   },
+  rowIcon: {
+    width: 20,
+  },
+  chevron: {
+    marginLeft: 'auto',
+  },
   separator: {
     height: 1,
     backgroundColor: '#f1f1f1',
   },
+  logoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 20,
+  },
+  logoutLabel: {
+    fontSize: 15,
+    marginLeft: 15,
+    color: '#d32f2f',
+    fontWeight: '600',
+  },
 });
+
+function SettingsSeparator() {
+  return <View style={styles.separator} />;
+}
