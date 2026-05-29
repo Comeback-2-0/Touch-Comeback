@@ -2,22 +2,31 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import RootNavigator from '../app/navigation/RootNavigator';
 import {useAuth} from '../app/context/AuthContext';
+import {useCurrentProfile} from '../app/features/profile/hooks/useCurrentProfile';
 
 jest.mock('../app/context/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../app/features/profile/hooks/useCurrentProfile', () => ({
+  useCurrentProfile: jest.fn(),
+}));
+
+const mockScreenNames: string[] = [];
+
 jest.mock('@react-navigation/native-stack', () => ({
   createNativeStackNavigator: () => ({
     Navigator: ({children}: {children: React.ReactNode}) => <>{children}</>,
-    Screen: ({component: Component}: {component: React.ComponentType}) => (
-      <Component />
-    ),
+    Screen: ({name, component: Component}: {name: string; component: React.ComponentType}) => {
+      mockScreenNames.push(name);
+      return <Component />;
+    },
   }),
 }));
 
 jest.mock('../app/navigation/AppStack', () => () => null);
 jest.mock('../app/navigation/AuthStack', () => () => null);
+jest.mock('../app/screens/ProfileSetupScreen', () => () => null);
 
 jest.mock('react-native-reanimated', () => {
   const {View, Text} = require('react-native');
@@ -45,6 +54,17 @@ jest.mock('react-native-reanimated', () => {
 });
 
 describe('RootNavigator', () => {
+  beforeEach(() => {
+    mockScreenNames.length = 0;
+    jest.clearAllMocks();
+    jest.mocked(useCurrentProfile).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    } as any);
+  });
+
   it('renders a branded skeleton loading screen while auth restores', () => {
     jest.mocked(useAuth).mockReturnValue({
       user: null,
@@ -64,5 +84,82 @@ describe('RootNavigator', () => {
     expect(screen!.root.findByProps({testID: 'auth-loading-status'}).props.children).toBe(
       'Getting Touch ready...',
     );
+  });
+
+  it('routes unauthenticated users to the auth stack', () => {
+    jest.mocked(useAuth).mockReturnValue({
+      user: null,
+      loading: false,
+      signInWithGoogle: jest.fn(),
+      signOut: jest.fn(),
+    });
+
+    act(() => {
+      renderer.create(<RootNavigator />);
+    });
+
+    expect(mockScreenNames).toContain('Auth');
+  });
+
+  it('routes incomplete authenticated users to profile setup', () => {
+    jest.mocked(useAuth).mockReturnValue({
+      user: {_id: 'u1', name: 'Maya', email: 'maya@example.com'},
+      loading: false,
+      signInWithGoogle: jest.fn(),
+      signOut: jest.fn(),
+    });
+    jest.mocked(useCurrentProfile).mockReturnValue({
+      data: {
+        id: 'u1',
+        username: '',
+        bio: '',
+        profilePicture: '',
+        isPrivate: false,
+        followersCount: 0,
+        followingCount: 0,
+        postsCount: 0,
+        isProfileComplete: false,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    } as any);
+
+    act(() => {
+      renderer.create(<RootNavigator />);
+    });
+
+    expect(mockScreenNames).toContain('ProfileSetup');
+  });
+
+  it('routes complete authenticated users to the main app', () => {
+    jest.mocked(useAuth).mockReturnValue({
+      user: {_id: 'u1', name: 'Maya', email: 'maya@example.com'},
+      loading: false,
+      signInWithGoogle: jest.fn(),
+      signOut: jest.fn(),
+    });
+    jest.mocked(useCurrentProfile).mockReturnValue({
+      data: {
+        id: 'u1',
+        username: 'maya',
+        bio: '',
+        profilePicture: '',
+        isPrivate: false,
+        followersCount: 0,
+        followingCount: 0,
+        postsCount: 0,
+        isProfileComplete: true,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    } as any);
+
+    act(() => {
+      renderer.create(<RootNavigator />);
+    });
+
+    expect(mockScreenNames).toContain('Main');
   });
 });

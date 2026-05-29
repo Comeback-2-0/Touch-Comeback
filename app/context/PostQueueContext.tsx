@@ -1,6 +1,6 @@
 // PostQueueContext.tsx
 import React, { createContext, useContext, useState } from 'react';
-import { Post } from '../types/Post';
+import { Post } from '../navigation/types/Post';
 
 type PostQueueContextType = {
   queue: Post[];
@@ -18,7 +18,7 @@ export const PostQueueProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const removePostFromQueue = (id: string) => {
-    setQueue((prev) => prev.filter((post) => post.id !== id));
+    setQueue((prev) => prev.filter((post) => post._id !== id));
   };
 
   return (

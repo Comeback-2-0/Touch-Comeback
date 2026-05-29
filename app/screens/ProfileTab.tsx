@@ -1,164 +1,208 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
   Image,
-  TouchableOpacity,
-  FlatList,
-  Dimensions,
-  ListRenderItem,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import {pastelColors} from '../theme/colors';
+import type {ProfileStackParamList} from '../navigation/ProfileStack';
+import {useCurrentProfile} from '../features/profile/hooks/useCurrentProfile';
+import ProfileStats from '../features/profile/components/ProfileStats';
+import ProfileStatusPill from '../features/profile/components/ProfileStatusPill';
+import ProfilePlaceholderTabs from '../features/profile/components/ProfilePlaceholderTabs';
 
-// Define the navigation param types
-type RootStackParamList = {
-  EditProfile: undefined;
-  Settings: undefined;
-  SavedReels: undefined
-};
+type Navigation = NativeStackNavigationProp<ProfileStackParamList, 'ProfileTabScreen'>;
 
-type Post = {
-  id: string;
-  image: string;
-};
-
-const dummyPosts: Post[] = Array.from({ length: 21 }, (_, i) => ({
-  id: i.toString(),
-  image:
-    'https://photosbulk.com/wp-content/uploads/instagram-profile-picture-avatar_39.webp',
-}));
-
-const screenWidth = Dimensions.get('window').width;
-const gap = 4;
-const postSize = (screenWidth - gap * 4) / 3;
+function ProfileLoading() {
+  return (
+    <SafeAreaView style={styles.centered}>
+      <ActivityIndicator color={pastelColors.accent} />
+      <Text style={styles.centerText}>Loading profile...</Text>
+    </SafeAreaView>
+  );
+}
 
 export default function ProfileScreen() {
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<Navigation>();
+  const {data: profile, isLoading, isError, refetch} = useCurrentProfile();
 
-  const renderPost: ListRenderItem<Post> = ({ item }) => (
-    <Image source={{ uri: item.image }} style={styles.postImage} />
-  );
+  if (isLoading) return <ProfileLoading />;
+
+  if (isError || !profile) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <Text style={styles.errorTitle}>Could not load profile</Text>
+        <Pressable testID="profile-retry-button" onPress={() => refetch()} style={styles.retryButton}>
+          <Text style={styles.retryLabel}>Retry</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {/* Top Profile Info */}
-      <View style={styles.profileTop}>
-        <Image
-          source={{
-            uri: 'https://photosbulk.com/wp-content/uploads/instagram-profile-picture-avatar_39.webp',
-          }}
-          style={styles.avatar}
-        />
-        <View style={styles.statsContainer}>
-          <View style={styles.stat}>
-            <Text style={styles.statCount}>54</Text>
-            <Text style={styles.statLabel}>Posts</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statCount}>1.2k</Text>
-            <Text style={styles.statLabel}>Followers</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statCount}>180</Text>
-            <Text style={styles.statLabel}>Following</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerRow}>
+          <Text style={styles.screenTitle}>Profile</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.iconButton}>
+            <Ionicons name="settings-outline" size={22} color={pastelColors.auth.deepText} />
+          </Pressable>
+        </View>
+
+        <View style={styles.hero}>
+          {profile.profilePicture ? (
+            <Image source={{uri: profile.profilePicture}} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.emptyAvatar]}>
+              <Ionicons name="person" size={42} color={pastelColors.accent} />
+            </View>
+          )}
+          <View style={styles.identity}>
+            <Text testID="profile-username" style={styles.username}>
+              @{profile.username || 'touch_user'}
+            </Text>
+            <ProfileStatusPill isPrivate={profile.isPrivate} />
           </View>
         </View>
-      </View>
 
-      {/* Username & Bio */}
-      <View style={styles.bioContainer}>
-        <Text style={styles.username}>Anonymous Owl</Text>
-        <Text style={styles.bio}>I post vibes. Just here for the feels 🦉</Text>
-      </View>
+        <Text testID="profile-bio" style={styles.bio}>
+          {profile.bio || 'No bio yet.'}
+        </Text>
 
-      {/* Buttons */}
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => navigation.navigate('EditProfile')}
-        >
-          <Text style={styles.buttonText}>Edit Profile</Text>
-        </TouchableOpacity>
-
-         <TouchableOpacity style = {styles.button} onPress={()=>navigation.navigate('SavedReels')}>
-          <Text style={styles.buttonText}>Your saved reels</Text>
-         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <Text style={styles.buttonText}>Settings</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Post Grid */}
-      <View style={styles.gridContainer}>
-        <FlatList
-          data={dummyPosts}
-          renderItem={renderPost}
-          keyExtractor={(item) => item.id}
-          numColumns={3}
-          showsVerticalScrollIndicator={false}
-          columnWrapperStyle={{
-            justifyContent: 'space-between',
-            marginBottom: gap + 2,
-          }}
-          contentContainerStyle={{ paddingHorizontal: gap, paddingTop: gap }}
+        <ProfileStats
+          posts={profile.postsCount}
+          followers={profile.followersCount}
+          following={profile.followingCount}
         />
-      </View>
-    </View>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('EditProfile')}
+          style={styles.editButton}>
+          <Ionicons name="create-outline" size={18} color={pastelColors.white} />
+          <Text style={styles.editLabel}>Edit Profile</Text>
+        </Pressable>
+
+        <ProfilePlaceholderTabs />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  profileTop: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: pastelColors.auth.background,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 36,
+  },
+  headerRow: {
     flexDirection: 'row',
-    padding: 20,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 22,
+  },
+  screenTitle: {
+    color: pastelColors.auth.deepText,
+    fontSize: 30,
+    fontWeight: '900',
+  },
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.white,
+  },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
   },
   avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: pastelColors.card,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  emptyAvatar: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identity: {
     flex: 1,
-    marginLeft: 20,
+    marginLeft: 18,
+    gap: 10,
   },
-  stat: { alignItems: 'center' },
-  statCount: { fontWeight: 'bold', fontSize: 16 },
-  statLabel: { color: 'gray' },
-  bioContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 10,
+  username: {
+    color: pastelColors.auth.deepText,
+    fontSize: 23,
+    fontWeight: '900',
   },
-  username: { fontWeight: 'bold', fontSize: 16 },
-  bio: { color: 'gray', marginTop: 4 },
-  buttonRow: {
+  bio: {
+    marginBottom: 20,
+    color: pastelColors.auth.mutedText,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  editButton: {
+    marginTop: 20,
+    minHeight: 52,
+    borderRadius: 18,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 10,
-    paddingHorizontal: 20,
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.accent,
   },
-  button: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  editLabel: {
+    color: pastelColors.white,
+    fontSize: 15,
+    fontWeight: '900',
   },
-  buttonText: { fontWeight: '600' },
-  gridContainer: {
+  centered: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: pastelColors.auth.background,
   },
-  postImage: {
-    width: postSize,
-    height: postSize,
-    borderRadius: 4,
+  centerText: {
+    marginTop: 12,
+    color: pastelColors.auth.mutedText,
+    fontWeight: '700',
+  },
+  errorTitle: {
+    color: pastelColors.auth.deepText,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  retryButton: {
+    marginTop: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: pastelColors.accent,
+  },
+  retryLabel: {
+    color: pastelColors.white,
+    fontWeight: '900',
   },
 });

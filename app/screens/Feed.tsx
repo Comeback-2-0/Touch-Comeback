@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/PostReelsStack';
 import {
   View,
   Text,
@@ -24,8 +23,12 @@ type StoryUser = {
   avatar: string;
 };
 
-export default function FeedScreen(): JSX.Element {
-const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+type FeedNavigationParamList = {
+  PostReels: undefined;
+};
+
+export default function FeedScreen(): React.ReactElement {
+const navigation = useNavigation<NativeStackNavigationProp<FeedNavigationParamList>>();
 
   const storyUsers: StoryUser[] = Array(8)
     .fill(null)

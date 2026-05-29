@@ -1,4 +1,4 @@
-import React, {createContext, useContext, useEffect, useState} from 'react';
+import React, {createContext, useContext, useEffect} from 'react';
 import {
   getAuth,
   signInWithCredential,
@@ -14,15 +14,10 @@ import {
   saveAuthTokens,
 } from '../utils/authTokenStorage';
 import {createAuthFlowError} from '../utils/authErrors';
-
-export type BackendUser = {
-  _id: string;
-  uid?: string;
-  name: string;
-  email: string;
-  photo?: string;
-  role?: string;
-};
+import {
+  BackendUser,
+  useAuthStore,
+} from '../features/profile/store/authStore';
 
 interface AuthContextShape {
   user: BackendUser | null;
@@ -37,12 +32,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   children,
 }) => {
   const auth = getAuth();
-  const [user, setUser] = useState<BackendUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const user = useAuthStore(state => state.user);
+  const loading = useAuthStore(state => state.loading);
+  const setUser = useAuthStore(state => state.setUser);
+  const setLoading = useAuthStore(state => state.setLoading);
+  const resetAuth = useAuthStore(state => state.resetAuth);
 
   useEffect(() => {
     setAuthFailureHandler(() => {
-      setUser(null);
+      resetAuth();
     });
 
     const restoreSession = async () => {
@@ -54,7 +52,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         setUser(response.data.user);
       } catch (err) {
         await clearAuthTokens();
-        setUser(null);
+        resetAuth();
       } finally {
         setLoading(false);
       }
@@ -63,7 +61,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     restoreSession();
 
     return () => setAuthFailureHandler(null);
-  }, []);
+  }, [resetAuth, setLoading, setUser]);
 
   const signInWithGoogle = async () => {
     try {
@@ -106,7 +104,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     await firebaseSignOut(auth);
     await GoogleSignin.revokeAccess();
     await GoogleSignin.signOut();
-    setUser(null);
+    resetAuth();
   };
 
   return (
