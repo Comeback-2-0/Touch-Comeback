@@ -7,13 +7,16 @@ import { RouteProp } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 
-import { PostQueueProvider } from '../context/PostQueueContext';
+// PostQueueProvider import preserved — will be restored when Community is ready
+// import { PostQueueProvider } from '../context/PostQueueContext';
 
-import Feed from '../screens/Feed';
-import Reels from '../screens/ReelScreen';
-import SearchBar from '../screens/SearchBar';
+import {
+  HomeComingSoon,
+  SearchComingSoon,
+  CommunityComingSoon,
+  ReelsComingSoon,
+} from '../screens/coming-soon';
 import ProfileStack from './ProfileStack';
-import ChatNavigator from './ChatNavigator';
 import PostReelStack from './PostReelsStack';
 import EditProfile from '../screens/EditProfile';
 import SettingsStack from './SettingsStack';
@@ -52,13 +55,14 @@ function getTabIcon(routeName: keyof MainTabParamList, color: string, size: numb
   }
 }
 
-function ChatTabScreen() {
-  return (
-    <PostQueueProvider>
-      <ChatNavigator />
-    </PostQueueProvider>
-  );
-}
+// ChatTabScreen wrapper preserved — will be restored when Community is ready
+// function ChatTabScreen() {
+//   return (
+//     <PostQueueProvider>
+//       <ChatNavigator />
+//     </PostQueueProvider>
+//   );
+// }
 
 function getTabScreenOptions({
   route,
@@ -90,10 +94,10 @@ function getTabScreenOptions({
 function BottomTabNavigator() {
   return (
     <Tab.Navigator screenOptions={getTabScreenOptions}>
-      <Tab.Screen name="Home" component={Feed} />
-      <Tab.Screen name="SearchBar" component={SearchBar} />
-      <Tab.Screen name="ChatTab" component={ChatTabScreen} />
-      <Tab.Screen name="Reels" component={Reels} />
+      <Tab.Screen name="Home" component={HomeComingSoon} />
+      <Tab.Screen name="SearchBar" component={SearchComingSoon} />
+      <Tab.Screen name="ChatTab" component={CommunityComingSoon} />
+      <Tab.Screen name="Reels" component={ReelsComingSoon} />
       <Tab.Screen name="ProfileTab" component={ProfileStack} />
     </Tab.Navigator>
   );

@@ -58,7 +58,8 @@ describe('SettingsScreen', () => {
     ].forEach(label => {
       expect(screen!.root.findAllByProps({children: label}).length).toBeGreaterThan(0);
     });
-    expect(screen!.root.findByProps({testID: 'settings-app-version'}).props.children).toContain('0.0.1');
+    const {version: expectedVersion} = require('../package.json');
+    expect(screen!.root.findByProps({testID: 'settings-app-version'}).props.children).toContain(expectedVersion);
   });
 
   it('opens external settings links', () => {

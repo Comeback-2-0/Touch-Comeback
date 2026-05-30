@@ -16,7 +16,9 @@ import {SettingsStackParamList} from '../navigation/types/SettingsStackParamList
 import {useAuth} from '../context/AuthContext';
 import {pastelColors} from '../theme/colors';
 
-const APP_VERSION = '0.0.1';
+// Read version from root package.json so UI stays in sync with native builds
+// Use require to avoid needing additional TS config changes for JSON imports
+const {version: APP_VERSION} = require('../../package.json');
 
 const LINKS = {
   childSafety: 'https://ij-roy.github.io/touch/child-safety-standards/',
