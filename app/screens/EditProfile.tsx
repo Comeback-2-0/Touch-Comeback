@@ -5,7 +5,7 @@ import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {pastelColors} from '../theme/colors';
-import type {ProfileStackParamList} from '../navigation/ProfileStack';
+import type {AppStackParamList} from '../navigation/AppStack';
 import ProfileForm from '../features/profile/components/ProfileForm';
 import {useCurrentProfile} from '../features/profile/hooks/useCurrentProfile';
 import {useProfileImagePicker} from '../features/profile/hooks/useProfileImagePicker';
@@ -15,7 +15,7 @@ import {
 } from '../features/profile/hooks/useProfileMutations';
 import type {LocalProfileImage, ProfilePayload} from '../features/profile/types';
 
-type Navigation = NativeStackNavigationProp<ProfileStackParamList, 'EditProfile'>;
+type Navigation = NativeStackNavigationProp<AppStackParamList, 'EditProfile'>;
 
 function getErrorMessage(error: unknown) {
   if (!error) return undefined;

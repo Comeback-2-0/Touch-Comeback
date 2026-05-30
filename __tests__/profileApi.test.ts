@@ -41,7 +41,7 @@ describe('profileApi', () => {
     mockedApi.patch.mockResolvedValueOnce({data: {user: {username: 'maya2'}}});
 
     await completeProfile({username: 'maya', bio: 'bio', isPrivate: true});
-    await updateProfile({username: 'maya2', profilePicturePublicId: 'public-id'});
+    await updateProfile({name: 'Maya Two', username: 'maya2', profilePicturePublicId: 'public-id'});
 
     expect(mockedApi.post).toHaveBeenCalledWith('/users/complete-profile', {
       username: 'maya',
@@ -49,6 +49,7 @@ describe('profileApi', () => {
       isPrivate: true,
     });
     expect(mockedApi.patch).toHaveBeenCalledWith('/users/me', {
+      name: 'Maya Two',
       username: 'maya2',
       profilePicturePublicId: 'public-id',
     });

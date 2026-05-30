@@ -1,5 +1,6 @@
 export type Profile = {
   id: string;
+  name: string;
   username: string;
   bio: string;
   profilePicture: string;
@@ -22,6 +23,7 @@ export type LocalProfileImage = {
 };
 
 export type ProfilePayload = {
+  name?: string;
   username?: string;
   bio?: string;
   isPrivate?: boolean;

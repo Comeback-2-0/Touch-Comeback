@@ -3,12 +3,14 @@ import renderer, {act} from 'react-test-renderer';
 import SettingsStack from '../app/navigation/SettingsStack';
 
 const mockScreenNames: string[] = [];
+const mockScreenOptions: Record<string, any> = {};
 
 jest.mock('@react-navigation/native-stack', () => ({
   createNativeStackNavigator: () => ({
     Navigator: ({children}: {children: React.ReactNode}) => <>{children}</>,
-    Screen: ({name}: {name: string}) => {
+    Screen: ({name, options}: {name: string; options?: Record<string, any>}) => {
       mockScreenNames.push(name);
+      mockScreenOptions[name] = options;
       return null;
     },
   }),
@@ -29,6 +31,10 @@ jest.mock('../app/context/AuthContext', () => ({
   }),
 }));
 
+jest.mock('react-native-image-crop-picker', () => ({
+  openPicker: jest.fn(),
+}));
+
 jest.mock('react-native-vector-icons/Ionicons', () => {
   const {Text} = require('react-native');
   return ({name}: {name: string}) => <Text>{name}</Text>;
@@ -37,6 +43,7 @@ jest.mock('react-native-vector-icons/Ionicons', () => {
 describe('SettingsStack', () => {
   beforeEach(() => {
     mockScreenNames.length = 0;
+    Object.keys(mockScreenOptions).forEach(key => delete mockScreenOptions[key]);
   });
 
   it('uses a unique route name for the settings landing screen', () => {
@@ -46,5 +53,26 @@ describe('SettingsStack', () => {
 
     expect(mockScreenNames).toContain('SettingsHome');
     expect(mockScreenNames).not.toContain('Settings');
+  });
+
+  it('hides the native header on the settings landing screen', () => {
+    act(() => {
+      renderer.create(<SettingsStack />);
+    });
+
+    expect(mockScreenOptions.SettingsHome).toEqual(expect.objectContaining({headerShown: false}));
+  });
+
+  it('registers in-app FAQ and feedback form routes without native headers', () => {
+    act(() => {
+      renderer.create(<SettingsStack />);
+    });
+
+    expect(mockScreenNames).toEqual(
+      expect.arrayContaining(['FAQ', 'ReportBug', 'SuggestFeature']),
+    );
+    expect(mockScreenOptions.FAQ).toEqual(expect.objectContaining({headerShown: false}));
+    expect(mockScreenOptions.ReportBug).toEqual(expect.objectContaining({headerShown: false}));
+    expect(mockScreenOptions.SuggestFeature).toEqual(expect.objectContaining({headerShown: false}));
   });
 });

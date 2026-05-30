@@ -135,6 +135,58 @@ export const uploadReel = (formData: FormData) =>
     },
   });
 
+type BugReportPayload = {
+  whatHappened: string;
+  stepsToReproduce: string;
+  screenshot?: {
+    uri: string;
+    fileName?: string;
+    type?: string;
+  } | null;
+};
+
+type FeatureRequestPayload = {
+  title: string;
+  description: string;
+};
+
+type FeedbackSubmitResponse = {
+  id: string;
+};
+
+export const submitBugReport = async (payload: BugReportPayload): Promise<FeedbackSubmitResponse> => {
+  if (!payload.screenshot) {
+    const response = await api.post<FeedbackSubmitResponse>('/feedback/bug-reports', {
+      whatHappened: payload.whatHappened,
+      stepsToReproduce: payload.stepsToReproduce,
+    });
+    return response.data;
+  }
+
+  const formData = new FormData();
+  formData.append('whatHappened', payload.whatHappened);
+  formData.append('stepsToReproduce', payload.stepsToReproduce);
+  formData.append('screenshot', {
+    uri: payload.screenshot.uri,
+    name: payload.screenshot.fileName || 'bug-screenshot.jpg',
+    type: payload.screenshot.type || 'image/jpeg',
+  } as any);
+
+  const response = await api.post<FeedbackSubmitResponse>('/feedback/bug-reports', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
+export const submitFeatureRequest = async (
+  payload: FeatureRequestPayload,
+): Promise<FeedbackSubmitResponse> => {
+  const response = await api.post<FeedbackSubmitResponse>('/feedback/feature-requests', payload);
+  return response.data;
+};
+
 export const fetchReelMoods = () =>
   api.get('/api/reels/moods');
 

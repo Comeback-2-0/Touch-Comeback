@@ -7,12 +7,15 @@ const read = (relativePath: string) =>
   fs.readFileSync(path.join(root, relativePath), 'utf8');
 
 describe('native splash resources', () => {
-  it('uses transparent light system bars so app backgrounds can draw edge-to-edge', () => {
+  it('uses app-colored light Android navigation bars so system buttons remain readable', () => {
     const styles = read('android/app/src/main/res/values/styles.xml');
+    const colors = read('android/app/src/main/res/values/colors.xml');
 
     expect(styles).toContain('<item name="android:statusBarColor">@android:color/transparent</item>');
-    expect(styles).toContain('<item name="android:navigationBarColor">@android:color/transparent</item>');
+    expect(styles).toContain('<item name="android:navigationBarColor">@color/touch_bottom_bar</item>');
     expect(styles).toContain('<item name="android:windowLightStatusBar">true</item>');
+    expect(styles).toContain('<item name="android:windowLightNavigationBar">true</item>');
+    expect(colors).toContain('<color name="touch_bottom_bar">#FFC0CB</color>');
   });
 
   it('uses the current app launcher icon instead of the old splash logo', () => {

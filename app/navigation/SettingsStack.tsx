@@ -10,6 +10,9 @@ import SecurityScreen from "../screens/Security";
 import AboutTouchScreen from "../screens/AboutTouch";
 import CommunityGuidelinesScreen from "../screens/Guildelines";
 import ReportProblemScreen from "../screens/Report";
+import FAQScreen from "../screens/FAQScreen";
+import ReportBugScreen from "../screens/ReportBugScreen";
+import SuggestFeatureScreen from "../screens/SuggestFeatureScreen";
 import { SettingsStackParamList } from "./types/SettingsStackParamList";
 
 const Stack = createNativeStackNavigator<SettingsStackParamList>();
@@ -21,7 +24,7 @@ export default function ProfileStack() {
       <Stack.Screen
         name="SettingsHome"
         component={Settings}
-        options={{ headerTitle: "Settings" }}
+        options={{ headerShown: false }}
       />
        <Stack.Screen
         name="ChangePassword"
@@ -62,6 +65,21 @@ export default function ProfileStack() {
         name="Guildlines"
         component={CommunityGuidelinesScreen}
         options={{ headerTitle: "Community Guidelines " }}
+      />
+      <Stack.Screen
+        name="FAQ"
+        component={FAQScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ReportBug"
+        component={ReportBugScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SuggestFeature"
+        component={SuggestFeatureScreen}
+        options={{ headerShown: false }}
       />
 
     </Stack.Navigator>

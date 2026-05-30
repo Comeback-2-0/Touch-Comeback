@@ -24,6 +24,8 @@ type Props = {
   subtitle: string;
   submitLabel: string;
   initialProfile?: Profile;
+  accountEmail?: string;
+  onSwitchAccount?: () => Promise<void> | void;
   image: LocalProfileImage | null;
   onPickImage: () => void;
   onSubmit: (payload: ProfilePayload, image: LocalProfileImage | null) => Promise<void>;
@@ -38,6 +40,8 @@ export default function ProfileForm({
   subtitle,
   submitLabel,
   initialProfile,
+  accountEmail,
+  onSwitchAccount,
   image,
   onPickImage,
   onSubmit,
@@ -46,6 +50,7 @@ export default function ProfileForm({
   uploadProgress = 0,
   errorMessage,
 }: Props) {
+  const [name, setName] = useState(initialProfile?.name || '');
   const [username, setUsername] = useState(initialProfile?.username || '');
   const [bio, setBio] = useState(initialProfile?.bio || '');
   const [isPrivate, setIsPrivate] = useState(initialProfile?.isPrivate || false);
@@ -55,10 +60,11 @@ export default function ProfileForm({
   const formValid = useMemo(
     () =>
       normalizedUsername.length > 0 &&
+      name.trim().length > 0 &&
       usernameState.isValidFormat &&
       usernameState.available &&
       bio.length <= BIO_LIMIT,
-    [bio.length, normalizedUsername.length, usernameState.available, usernameState.isValidFormat],
+    [bio.length, name, normalizedUsername.length, usernameState.available, usernameState.isValidFormat],
   );
 
   const submitDisabled = !formValid || submitting || uploading || usernameState.isChecking;
@@ -67,6 +73,7 @@ export default function ProfileForm({
     if (submitDisabled) return;
     await onSubmit(
       {
+        name: name.trim(),
         username: normalizedUsername,
         bio,
         isPrivate,
@@ -79,48 +86,88 @@ export default function ProfileForm({
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
 
-          <ProfileAvatarPicker
-            image={image}
-            fallbackUri={initialProfile?.profilePicture}
-            onPick={onPickImage}
-            uploading={uploading}
-            progress={uploadProgress}
-          />
+          <View testID="profile-field-picture">
+            <ProfileAvatarPicker
+              image={image}
+              fallbackUri={initialProfile?.profilePicture}
+              onPick={onPickImage}
+              uploading={uploading}
+              progress={uploadProgress}
+            />
+          </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Username</Text>
+          <View testID="profile-field-name" style={styles.field}>
+            <Text style={styles.label}>Name</Text>
             <TextInput
-              testID="profile-form-username"
-              autoCapitalize="none"
+              testID="profile-form-name"
+              autoCapitalize="words"
               autoCorrect={false}
-              value={username}
-              onChangeText={value => setUsername(normalizeUsername(value))}
-              placeholder="username"
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
               placeholderTextColor={pastelColors.auth.mutedText}
               style={styles.input}
             />
-            <View style={styles.statusRow}>
+          </View>
+
+          <View testID="profile-field-username" style={styles.field}>
+            <Text style={styles.label}>Username</Text>
+            <View style={styles.usernameInputShell}>
+              <TextInput
+                testID="profile-form-username"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={username}
+                onChangeText={value => setUsername(normalizeUsername(value))}
+                placeholder="username"
+                placeholderTextColor={pastelColors.auth.mutedText}
+                style={styles.usernameInput}
+              />
               {usernameState.isChecking ? (
                 <ActivityIndicator size="small" color={pastelColors.accent} />
-              ) : null}
-              <Text
-                style={[
-                  styles.helper,
-                  usernameState.available ? styles.successText : styles.errorText,
-                ]}>
-                {usernameState.message}
-              </Text>
+              ) : (
+                <Text
+                  testID="profile-username-status"
+                  numberOfLines={1}
+                  style={[
+                    styles.usernameStatus,
+                    usernameState.available ? styles.successText : styles.errorText,
+                  ]}>
+                  {usernameState.available ? 'Available' : usernameState.message}
+                </Text>
+              )}
             </View>
           </View>
 
-          <View style={styles.field}>
+          {accountEmail ? (
+            <View testID="profile-field-email" style={styles.field}>
+              <Text style={styles.label}>Email</Text>
+              <View style={styles.emailRow}>
+                <Text testID="profile-account-email" numberOfLines={1} style={styles.emailText}>
+                  {accountEmail}
+                </Text>
+                {onSwitchAccount ? (
+                  <Pressable
+                    testID="profile-switch-google-account"
+                    accessibilityRole="button"
+                    onPress={onSwitchAccount}
+                    style={styles.switchAccountButton}>
+                    <Text style={styles.switchAccountLabel}>Change</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
+          <View testID="profile-field-bio" style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={styles.label}>Bio</Text>
               <Text style={styles.counter}>
@@ -131,7 +178,7 @@ export default function ProfileForm({
               testID="profile-form-bio"
               value={bio}
               onChangeText={value => setBio(value.slice(0, BIO_LIMIT))}
-              placeholder="Tell people what kind of energy you bring."
+              placeholder="Optional"
               placeholderTextColor={pastelColors.auth.mutedText}
               multiline
               textAlignVertical="top"
@@ -139,11 +186,8 @@ export default function ProfileForm({
             />
           </View>
 
-          <View style={styles.privacyRow}>
-            <View>
-              <Text style={styles.label}>Private Account</Text>
-              <Text style={styles.helper}>Approve who can follow you.</Text>
-            </View>
+          <View testID="profile-field-private" style={styles.privacyRow}>
+            <Text style={[styles.label, styles.privacyLabel]}>Private Account</Text>
             <Switch
               testID="profile-form-private"
               value={isPrivate}
@@ -185,26 +229,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flexGrow: 1,
     paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 34,
+    paddingTop: 18,
+    paddingBottom: 18,
+    justifyContent: 'space-between',
   },
   title: {
     color: pastelColors.auth.deepText,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 0,
+    textAlign: 'center',
   },
   subtitle: {
-    marginTop: 8,
-    marginBottom: 28,
+    marginTop: 6,
+    marginBottom: 14,
     color: pastelColors.auth.mutedText,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '600',
+    textAlign: 'center',
   },
   field: {
-    marginBottom: 18,
+    marginBottom: 10,
   },
   label: {
     color: pastelColors.auth.deepText,
@@ -213,7 +261,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    minHeight: 52,
+    height: 48,
     borderRadius: 16,
     paddingHorizontal: 16,
     color: pastelColors.auth.deepText,
@@ -224,20 +272,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   bioInput: {
-    minHeight: 104,
-    paddingTop: 14,
-  },
-  statusRow: {
-    minHeight: 22,
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  helper: {
-    color: pastelColors.auth.mutedText,
-    fontSize: 12,
-    fontWeight: '700',
+    height: 78,
+    paddingTop: 12,
   },
   successText: {
     color: pastelColors.success,
@@ -256,16 +292,76 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   privacyRow: {
-    minHeight: 72,
+    minHeight: 58,
     borderRadius: 18,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: pastelColors.white,
     borderWidth: 1,
     borderColor: pastelColors.auth.glassBorder,
+  },
+  privacyLabel: {
+    marginBottom: 0,
+  },
+  usernameInputShell: {
+    height: 48,
+    borderRadius: 16,
+    paddingLeft: 16,
+    paddingRight: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: pastelColors.auth.glassBorder,
+  },
+  usernameInput: {
+    flex: 1,
+    color: pastelColors.auth.deepText,
+    fontSize: 15,
+    fontWeight: '700',
+    paddingVertical: 0,
+  },
+  usernameStatus: {
+    maxWidth: 122,
+    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  emailRow: {
+    height: 48,
+    borderRadius: 16,
+    paddingLeft: 16,
+    paddingRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7EEF2',
+    borderWidth: 1,
+    borderColor: '#E6CAD5',
+  },
+  emailText: {
+    flex: 1,
+    color: pastelColors.auth.deepText,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  switchAccountButton: {
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: pastelColors.auth.glassBorder,
+  },
+  switchAccountLabel: {
+    color: pastelColors.accent,
+    fontSize: 12,
+    fontWeight: '900',
   },
   formError: {
     marginTop: 14,
@@ -274,7 +370,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     minHeight: 54,
-    marginTop: 24,
+    marginTop: 6,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',

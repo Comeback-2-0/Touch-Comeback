@@ -30,7 +30,7 @@ export default function ProfileAvatarPicker({
         onPress={onPick}
         style={styles.avatarButton}>
         {uri ? (
-          <Image source={{uri}} style={styles.avatar} />
+          <Image testID="profile-avatar-image" source={{uri}} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.emptyAvatar]}>
             <Ionicons name="camera-outline" size={34} color={pastelColors.accent} />
@@ -46,9 +46,7 @@ export default function ProfileAvatarPicker({
           <ActivityIndicator size="small" color={pastelColors.accent} />
           <Text style={styles.progressText}>Uploading {progress}%</Text>
         </View>
-      ) : (
-        <Text style={styles.helper}>Tap to pick and crop a square image</Text>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -56,17 +54,17 @@ export default function ProfileAvatarPicker({
 const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
   },
   avatarButton: {
-    width: 118,
-    height: 118,
-    borderRadius: 59,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
   },
   avatar: {
-    width: 118,
-    height: 118,
-    borderRadius: 59,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: pastelColors.card,
   },
   emptyAvatar: {
@@ -89,16 +87,10 @@ const styles = StyleSheet.create({
     borderColor: pastelColors.white,
   },
   label: {
-    marginTop: 12,
+    marginTop: 8,
     fontSize: 15,
     fontWeight: '800',
     color: pastelColors.auth.deepText,
-  },
-  helper: {
-    marginTop: 4,
-    color: pastelColors.auth.mutedText,
-    fontSize: 12,
-    fontWeight: '600',
   },
   progressRow: {
     flexDirection: 'row',

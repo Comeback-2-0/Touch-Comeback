@@ -12,14 +12,15 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Feather from 'react-native-vector-icons/Feather';
 import {pastelColors} from '../theme/colors';
-import type {ProfileStackParamList} from '../navigation/ProfileStack';
+import type {AppStackParamList} from '../navigation/AppStack';
 import {useCurrentProfile} from '../features/profile/hooks/useCurrentProfile';
 import ProfileStats from '../features/profile/components/ProfileStats';
 import ProfileStatusPill from '../features/profile/components/ProfileStatusPill';
 import ProfilePlaceholderTabs from '../features/profile/components/ProfilePlaceholderTabs';
 
-type Navigation = NativeStackNavigationProp<ProfileStackParamList, 'ProfileTabScreen'>;
+type Navigation = NativeStackNavigationProp<AppStackParamList>;
 
 function ProfileLoading() {
   return (
@@ -57,7 +58,7 @@ export default function ProfileScreen() {
             accessibilityLabel="Open settings"
             onPress={() => navigation.navigate('Settings')}
             style={styles.iconButton}>
-            <Ionicons name="settings-outline" size={22} color={pastelColors.auth.deepText} />
+            <Feather name="settings" size={22} color={pastelColors.auth.deepText} />
           </Pressable>
         </View>
 
@@ -70,6 +71,9 @@ export default function ProfileScreen() {
             </View>
           )}
           <View style={styles.identity}>
+            <Text testID="profile-name" style={styles.displayName}>
+              {profile.name || 'Touch User'}
+            </Text>
             <Text testID="profile-username" style={styles.username}>
               @{profile.username || 'touch_user'}
             </Text>
@@ -151,6 +155,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   username: {
+    marginTop: 2,
+    color: pastelColors.auth.deepText,
+    fontSize: 15,
+    fontWeight: '800',
+    opacity: 0.78,
+  },
+  displayName: {
     color: pastelColors.auth.deepText,
     fontSize: 23,
     fontWeight: '900',

@@ -5,7 +5,9 @@ import {
   useCompleteProfile,
   useUploadProfilePicture,
 } from '../features/profile/hooks/useProfileMutations';
-import type {LocalProfileImage, ProfilePayload} from '../features/profile/types';
+import {useCurrentProfile} from '../features/profile/hooks/useCurrentProfile';
+import {useAuth} from '../context/AuthContext';
+import type {LocalProfileImage, Profile, ProfilePayload} from '../features/profile/types';
 
 function getErrorMessage(error: unknown) {
   if (!error) return undefined;
@@ -14,6 +16,29 @@ function getErrorMessage(error: unknown) {
 }
 
 export default function ProfileSetupScreen() {
+  const {user, signOut} = useAuth();
+  const {data: currentProfile} = useCurrentProfile();
+  const googlePhoto = user?.photo || '';
+  const setupProfile: Profile | undefined = currentProfile
+    ? {
+        ...currentProfile,
+        name: currentProfile.name || user?.name || '',
+        profilePicture: currentProfile.profilePicture || googlePhoto,
+      }
+    : googlePhoto
+      ? {
+          id: user?._id || '',
+          name: user?.name || '',
+          username: '',
+          bio: '',
+          profilePicture: googlePhoto,
+          isPrivate: false,
+          followersCount: 0,
+          followingCount: 0,
+          postsCount: 0,
+          isProfileComplete: false,
+        }
+      : undefined;
   const imagePicker = useProfileImagePicker();
   const uploadMutation = useUploadProfilePicture();
   const completeMutation = useCompleteProfile();
@@ -30,6 +55,11 @@ export default function ProfileSetupScreen() {
           profilePicture: uploaded.url,
           profilePicturePublicId: uploaded.publicId,
         };
+      } else if (setupProfile?.profilePicture) {
+        nextPayload = {
+          ...payload,
+          profilePicture: setupProfile.profilePicture,
+        };
       }
       await completeMutation.mutateAsync(nextPayload);
     } catch (err) {
@@ -42,6 +72,9 @@ export default function ProfileSetupScreen() {
       title="Create your profile"
       subtitle="Set your Touch identity before entering the app."
       submitLabel="Continue"
+      initialProfile={setupProfile}
+      accountEmail={user?.email}
+      onSwitchAccount={signOut}
       image={imagePicker.image}
       onPickImage={imagePicker.pickImage}
       onSubmit={handleSubmit}

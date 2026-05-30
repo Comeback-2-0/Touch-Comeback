@@ -1,6 +1,7 @@
 import React, {useEffect} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {ScrollView, StyleSheet, View} from 'react-native';
 import type {DimensionValue} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -52,98 +53,132 @@ function SkeletonBar({width, height, delay = 0}: SkeletonBarProps) {
 }
 
 export default function AuthLoadingScreen() {
-  const float = useSharedValue(0);
-
-  useEffect(() => {
-    float.value = withRepeat(
-      withTiming(1, {duration: 1800, easing: Easing.inOut(Easing.ease)}),
-      -1,
-      true,
-    );
-  }, [float]);
-
-  const cardMotion = useAnimatedStyle(() => ({
-    transform: [{translateY: float.value * -8}],
-  }));
-
   return (
-    <View testID="auth-loading-screen" style={styles.container}>
-      <AnimatedView style={[styles.motionPanelTop, cardMotion]} />
-      <View style={styles.brandMark}>
-        <Text style={styles.brandLetter}>T</Text>
+    <SafeAreaView testID="auth-loading-screen" style={styles.container}>
+      <View testID="auth-header-skeleton" style={styles.header}>
+        <SkeletonBar width={28} height={28} />
+        <SkeletonBar width={118} height={22} delay={80} />
+        <SkeletonBar width={28} height={28} delay={160} />
       </View>
-      <AnimatedView style={[styles.card, cardMotion]}>
-        <SkeletonBar width="46%" height={18} />
-        <SkeletonBar width="82%" height={12} delay={120} />
-        <SkeletonBar width="68%" height={12} delay={240} />
-        <View style={styles.skeletonGroup}>
-          <SkeletonBar width="100%" height={48} delay={320} />
-          <SkeletonBar width="74%" height={12} delay={420} />
+      <ScrollView
+        testID="auth-feed-skeleton"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.feed}>
+        <View style={styles.storyRow}>
+          {Array.from({length: 6}).map((_, index) => (
+            <View key={index} testID="auth-story-skeleton" style={styles.storyItem}>
+              <View style={styles.storyRing}>
+                <SkeletonBar width={50} height={50} delay={index * 70} />
+              </View>
+              <SkeletonBar width={46} height={8} delay={index * 80} />
+            </View>
+          ))}
         </View>
-      </AnimatedView>
-      <Text testID="auth-loading-status" style={styles.status}>
-        Getting Touch ready...
-      </Text>
-    </View>
+
+        {Array.from({length: 2}).map((_, index) => (
+          <View key={index} testID="auth-post-skeleton" style={styles.post}>
+            <View style={styles.postHeader}>
+              <View style={styles.postAuthor}>
+                <SkeletonBar width={86} height={10} delay={index * 90} />
+                <SkeletonBar width={54} height={8} delay={index * 110} />
+              </View>
+              <SkeletonBar width={32} height={32} delay={index * 120} />
+            </View>
+            <View style={styles.postImage}>
+              <SkeletonBar width="100%" height={356} delay={index * 150} />
+            </View>
+            <View style={styles.actionRow}>
+              <SkeletonBar width={58} height={26} delay={index * 180} />
+              <View style={styles.actionGroup}>
+                <SkeletonBar width={52} height={26} delay={index * 210} />
+                <SkeletonBar width={52} height={26} delay={index * 240} />
+              </View>
+            </View>
+            <SkeletonBar width="42%" height={10} delay={index * 260} />
+            <SkeletonBar width="26%" height={8} delay={index * 280} />
+          </View>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: pastelColors.white,
+  },
+  header: {
+    minHeight: 58,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 28,
-    backgroundColor: pastelColors.auth.background,
+    justifyContent: 'space-between',
+    backgroundColor: pastelColors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E3E8',
+  },
+  feed: {
+    paddingBottom: 28,
+  },
+  storyRow: {
+    minHeight: 92,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1D1DD',
+  },
+  storyItem: {
+    width: 58,
+    alignItems: 'center',
+    gap: 8,
+  },
+  storyRing: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2,
+    borderColor: pastelColors.auth.shimmerBase,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
-  motionPanelTop: {
-    position: 'absolute',
-    top: 86,
-    width: 260,
-    height: 150,
-    borderRadius: 28,
-    backgroundColor: pastelColors.auth.accentOverlay,
-    transform: [{rotate: '-14deg'}],
+  post: {
+    paddingTop: 8,
   },
-  brandMark: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
+  postHeader: {
+    minHeight: 42,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-    backgroundColor: pastelColors.primary,
-    borderWidth: 1,
-    borderColor: pastelColors.auth.glassBorder,
-    shadowColor: pastelColors.shadow,
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    shadowOffset: {width: 0, height: 14},
-    elevation: 8,
+    justifyContent: 'space-between',
   },
-  brandLetter: {
-    color: pastelColors.white,
-    fontSize: 34,
-    fontWeight: '800',
+  postAuthor: {
+    gap: 7,
   },
-  card: {
+  postImage: {
     width: '100%',
-    maxWidth: 360,
-    padding: 24,
-    borderRadius: 28,
-    backgroundColor: pastelColors.auth.glassSurface,
-    borderWidth: 1,
-    borderColor: pastelColors.auth.glassBorder,
+    height: 356,
+    overflow: 'hidden',
+    backgroundColor: pastelColors.auth.shimmerBase,
   },
-  skeletonGroup: {
-    marginTop: 22,
-    gap: 14,
+  actionRow: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  actionGroup: {
+    flexDirection: 'row',
+    gap: 10,
   },
   skeletonBar: {
     overflow: 'hidden',
     borderRadius: 999,
-    marginBottom: 14,
     backgroundColor: pastelColors.auth.shimmerBase,
   },
   skeletonShimmer: {
@@ -151,11 +186,5 @@ const styles = StyleSheet.create({
     height: '100%',
     opacity: 0.9,
     backgroundColor: pastelColors.auth.shimmerHighlight,
-  },
-  status: {
-    marginTop: 24,
-    fontSize: 14,
-    fontWeight: '600',
-    color: pastelColors.auth.mutedText,
   },
 });

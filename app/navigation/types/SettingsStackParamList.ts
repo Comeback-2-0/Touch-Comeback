@@ -11,4 +11,7 @@ export type SettingsStackParamList = {
   Touch: undefined;
   Guildlines: undefined;
   Report: undefined;
+  FAQ: undefined;
+  ReportBug: undefined;
+  SuggestFeature: undefined;
 };

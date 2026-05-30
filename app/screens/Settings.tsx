@@ -1,205 +1,292 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
   StyleSheet,
-  FlatList,
+  Text,
+  View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {SettingsStackParamList} from '../navigation/types/SettingsStackParamList';
 import {useAuth} from '../context/AuthContext';
+import {pastelColors} from '../theme/colors';
+
+const APP_VERSION = '0.0.1';
+
+const LINKS = {
+  childSafety: 'https://ij-roy.github.io/touch/child-safety-standards/',
+  privacy: 'https://ij-roy.github.io/touch/privacy-policy/',
+  terms: 'https://ij-roy.github.io/touch/terms-and-conditions/',
+  community: 'https://ij-roy.github.io/touch/community-guidelines/',
+  contact: 'https://ij-roy.github.io/touch/contact/',
+  instagram: 'https://www.instagram.com/out_liarrs/',
+  website: 'https://ij-roy.github.io/touch/',
+  playStore: 'https://play.google.com/store/apps/details?id=roy.ij.touch',
+  supportMail: 'mailto:ijroy037@gmail.com?subject=Touch%20Support%20Request',
+};
 
 type NavigationProp = NativeStackNavigationProp<
   SettingsStackParamList,
   'SettingsHome'
 >;
 
-type SettingItem = {
+type SettingsAction = {
   key: string;
   label: string;
   icon: string;
-  screen: keyof SettingsStackParamList;
+  url?: string;
+  screen?: keyof SettingsStackParamList;
+  value?: string;
 };
 
-type Section = {
+type SettingsSection = {
   title: string;
-  data: SettingItem[];
+  actions: SettingsAction[];
 };
 
-const settingsSections: Section[] = [
+const sections: SettingsSection[] = [
   {
-    title: 'Account',
-    data: [
-      {
-        key: 'ChangePassword',
-        label: 'Change Password',
-        icon: 'lock-closed-outline',
-        screen: 'ChangePassword',
-      },
+    title: 'Help',
+    actions: [
+      {key: 'faq', label: 'FAQ', icon: 'help-circle-outline', screen: 'FAQ'},
+      {key: 'contact-us', label: 'Contact Us', icon: 'mail-outline', url: LINKS.supportMail},
+      {key: 'report-a-bug', label: 'Report a Bug', icon: 'bug-outline', screen: 'ReportBug'},
+      {key: 'suggest-a-feature', label: 'Suggest a Feature', icon: 'bulb-outline', screen: 'SuggestFeature'},
     ],
   },
   {
-    title: 'Preferences',
-    data: [
-      {
-        key: 'Notifications',
-        label: 'Notifications',
-        icon: 'notifications-outline',
-        screen: 'Notifications',
-      },
-      {
-        key: 'Theme',
-        label: 'Theme',
-        icon: 'color-palette-outline',
-        screen: 'Theme',
-      },
+    title: 'Touch',
+    actions: [
+      {key: 'instagram', label: 'Instagram', icon: 'logo-instagram', url: LINKS.instagram},
+      {key: 'website', label: 'Website', icon: 'globe-outline', url: LINKS.website},
+      {key: 'rate-on-google-play', label: 'Rate on Google Play', icon: 'star-outline', url: LINKS.playStore},
     ],
   },
   {
-    title: 'Privacy & Security',
-    data: [
-      {
-        key: 'BlockedAccounts',
-        label: 'Blocked Accounts',
-        icon: 'eye-off-outline',
-        screen: 'BlockedAccounts',
-      },
-      {
-        key: 'Security',
-        label: 'Security',
-        icon: 'shield-checkmark-outline',
-        screen: 'Security',
-      },
+    title: 'Legal',
+    actions: [
+      {key: 'privacy-policy', label: 'Privacy Policy', icon: 'shield-checkmark-outline', url: LINKS.privacy},
+      {key: 'terms-of-service', label: 'Terms of Service', icon: 'document-text-outline', url: LINKS.terms},
+      {key: 'community-guidelines', label: 'Community Guidelines', icon: 'people-outline', url: LINKS.community},
+      {key: 'child-safety-standards', label: 'Child Safety Standards', icon: 'heart-outline', url: LINKS.childSafety},
+    ],
+  },
+  {
+    title: 'App',
+    actions: [
+      {key: 'app-version', label: 'App Version', icon: 'information-circle-outline', value: APP_VERSION},
     ],
   },
 ];
 
-const settingsListData = [
-  ...settingsSections.flatMap(section => [
-    {type: 'header', title: section.title},
-    ...section.data.map(item => ({...item, type: 'item'})),
-  ]),
-  {type: 'logout', key: 'logout'},
-];
+function openExternalUrl(url: string) {
+  return Linking.openURL(url);
+}
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const {signOut} = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const renderLogout = () => (
-    <TouchableOpacity
-      testID="logout-button"
-      style={styles.logoutRow}
-      onPress={signOut}>
-      <Ionicons name="log-out-outline" size={20} color="#d32f2f" />
-      <Text style={styles.logoutLabel}>Log Out</Text>
-    </TouchableOpacity>
-  );
+  const handleAction = (action: SettingsAction) => {
+    if (action.url) {
+      openExternalUrl(action.url);
+      return;
+    }
 
-  const renderItem = ({item}: {item: SettingItem}) => (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => navigation.navigate(item.screen)}>
-      <Ionicons
-        name={item.icon}
-        size={18}
-        color="#555"
-        style={styles.rowIcon}
-      />
-      <Text style={styles.label}>{item.label}</Text>
-      <Ionicons
-        name="chevron-forward"
-        size={18}
-        color="#888"
-        style={styles.chevron}
-      />
-    </TouchableOpacity>
-  );
+    if (action.screen) {
+      navigation.navigate(action.screen);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await signOut();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
-    <FlatList
-      data={settingsListData}
-      renderItem={({item}: any) =>
-        item.type === 'header' ? (
-          <Text style={styles.sectionTitle}>{item.title}</Text>
-        ) : item.type === 'logout' ? (
-          renderLogout()
-        ) : (
-          renderItem({item})
-        )
-      }
-      keyExtractor={(item: any) => item.key ?? item.title}
-      contentContainerStyle={styles.container}
-      ItemSeparatorComponent={SettingsSeparator}
-      showsVerticalScrollIndicator={false}
-      removeClippedSubviews={false}
-    />
+    <SafeAreaView testID="settings-screen" style={styles.safeArea}>
+      <View style={styles.header}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={pastelColors.auth.deepText} />
+        </Pressable>
+        <Text testID="settings-title" style={styles.title}>
+          Settings
+        </Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}>
+        {sections.map(section => (
+          <View key={section.title} style={styles.section}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <View style={styles.card}>
+              {section.actions.map((action, index) => (
+                <Pressable
+                  key={action.key}
+                  testID={`settings-link-${action.key}`}
+                  accessibilityRole={action.value ? 'text' : 'button'}
+                  disabled={Boolean(action.value)}
+                  onPress={() => handleAction(action)}
+                  style={[
+                    styles.row,
+                    index < section.actions.length - 1 && styles.rowBorder,
+                  ]}>
+                  <View style={styles.iconWrap}>
+                    <Ionicons name={action.icon} size={19} color={pastelColors.accent} />
+                  </View>
+                  <Text style={styles.rowLabel}>{action.label}</Text>
+                  {action.value ? (
+                    <Text testID="settings-app-version" style={styles.rowValue}>
+                      {action.value}
+                    </Text>
+                  ) : (
+                    <Ionicons name="chevron-forward" size={18} color="#9A7C89" />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
+
+        <Pressable
+          testID="settings-action-logout"
+          accessibilityRole="button"
+          accessibilityState={{busy: isLoggingOut, disabled: isLoggingOut}}
+          android_ripple={{color: '#F3C7C7'}}
+          disabled={isLoggingOut}
+          style={styles.logoutButton}
+          onPress={handleLogout}>
+          {isLoggingOut ? (
+            <ActivityIndicator testID="settings-logout-spinner" color="#B42318" />
+          ) : (
+            <Ionicons name="log-out-outline" size={20} color="#B42318" />
+          )}
+          <Text testID="settings-logout-label" style={styles.logoutLabel}>
+            {isLoggingOut ? 'Logging out...' : 'Log Out'}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    backgroundColor: '#fff',
+  safeArea: {
+    flex: 1,
+    backgroundColor: pastelColors.auth.background,
+  },
+  header: {
+    minHeight: 64,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: pastelColors.auth.glassBorder,
+    backgroundColor: pastelColors.auth.background,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    marginBottom: 10,
+    justifyContent: 'center',
+    backgroundColor: pastelColors.white,
   },
-  backText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 8,
-    fontWeight: '500',
+  headerSpacer: {
+    width: 42,
+  },
+  title: {
+    color: pastelColors.auth.deepText,
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 34,
+  },
+  section: {
+    marginBottom: 18,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#555',
-    marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 8,
+    color: pastelColors.auth.mutedText,
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  card: {
+    overflow: 'hidden',
+    borderRadius: 18,
+    backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: pastelColors.auth.glassBorder,
   },
   row: {
+    minHeight: 56,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
   },
-  label: {
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3E4EA',
+  },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.card,
+  },
+  rowLabel: {
+    flex: 1,
+    marginLeft: 12,
+    color: pastelColors.auth.deepText,
     fontSize: 15,
-    marginLeft: 15,
-    color: '#333',
+    fontWeight: '800',
   },
-  rowIcon: {
-    width: 20,
+  rowValue: {
+    color: pastelColors.auth.mutedText,
+    fontSize: 14,
+    fontWeight: '800',
   },
-  chevron: {
-    marginLeft: 'auto',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#f1f1f1',
-  },
-  logoutRow: {
+  logoutButton: {
+    minHeight: 56,
+    marginTop: 4,
+    borderRadius: 18,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    marginTop: 20,
+    backgroundColor: '#FFF0F0',
+    borderWidth: 1,
+    borderColor: '#F3C7C7',
   },
   logoutLabel: {
+    marginLeft: 12,
+    color: '#B42318',
     fontSize: 15,
-    marginLeft: 15,
-    color: '#d32f2f',
-    fontWeight: '600',
+    fontWeight: '900',
   },
 });
-
-function SettingsSeparator() {
-  return <View style={styles.separator} />;
-}

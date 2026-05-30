@@ -1,3 +1,4 @@
+import {useEffect} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {fetchCurrentProfile} from '../api/profileApi';
 import {useAuthStore} from '../store/authStore';
@@ -11,15 +12,19 @@ type Options = {
 export function useCurrentProfile(options: Options = {}) {
   const setProfile = useAuthStore(state => state.setProfile);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: PROFILE_QUERY_KEY,
     queryFn: fetchCurrentProfile,
     enabled: options.enabled ?? true,
     retry: 2,
     staleTime: 30_000,
-    select: profile => {
-      setProfile(profile);
-      return profile;
-    },
   });
+
+  useEffect(() => {
+    if (query.data) {
+      setProfile(query.data);
+    }
+  }, [query.data, setProfile]);
+
+  return query;
 }

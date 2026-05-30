@@ -65,7 +65,7 @@ describe('RootNavigator', () => {
     } as any);
   });
 
-  it('renders a branded skeleton loading screen while auth restores', () => {
+  it('renders a neutral feed-shaped skeleton while auth restores', () => {
     jest.mocked(useAuth).mockReturnValue({
       user: null,
       loading: true,
@@ -80,10 +80,13 @@ describe('RootNavigator', () => {
     });
 
     expect(screen!.root.findByProps({testID: 'auth-loading-screen'})).toBeTruthy();
+    expect(screen!.root.findByProps({testID: 'auth-feed-skeleton'})).toBeTruthy();
+    expect(screen!.root.findByProps({testID: 'auth-header-skeleton'})).toBeTruthy();
+    expect(screen!.root.findAllByProps({testID: 'auth-story-skeleton'}).length).toBeGreaterThanOrEqual(6);
+    expect(screen!.root.findAllByProps({testID: 'auth-post-skeleton'}).length).toBeGreaterThanOrEqual(2);
     expect(screen!.root.findAllByProps({testID: 'auth-skeleton-bar'}).length).toBeGreaterThan(1);
-    expect(screen!.root.findByProps({testID: 'auth-loading-status'}).props.children).toBe(
-      'Getting Touch ready...',
-    );
+    expect(screen!.root.findAllByProps({testID: 'auth-loading-status'})).toHaveLength(0);
+    expect(screen!.root.findAllByProps({children: 'TOUCH'})).toHaveLength(0);
   });
 
   it('routes unauthenticated users to the auth stack', () => {
@@ -111,6 +114,7 @@ describe('RootNavigator', () => {
     jest.mocked(useCurrentProfile).mockReturnValue({
       data: {
         id: 'u1',
+        name: 'Maya',
         username: '',
         bio: '',
         profilePicture: '',
@@ -142,6 +146,7 @@ describe('RootNavigator', () => {
     jest.mocked(useCurrentProfile).mockReturnValue({
       data: {
         id: 'u1',
+        name: 'Maya',
         username: 'maya',
         bio: '',
         profilePicture: '',
