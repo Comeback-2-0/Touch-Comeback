@@ -2,7 +2,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import { RouteProp } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -52,6 +52,14 @@ function getTabIcon(routeName: keyof MainTabParamList, color: string, size: numb
   }
 }
 
+function ChatTabScreen() {
+  return (
+    <PostQueueProvider>
+      <ChatNavigator />
+    </PostQueueProvider>
+  );
+}
+
 function getTabScreenOptions({
   route,
 }: {
@@ -62,19 +70,21 @@ function getTabScreenOptions({
     tabBarShowLabel: false,
     tabBarActiveTintColor: '#ff00ff',
     tabBarInactiveTintColor: '#080008',
-    tabBarItemStyle: styles.tabBarItem,
     tabBarStyle: styles.tabBar,
+    tabBarItemStyle: styles.tabBarItem,
+    // The library's internal Pressable (tabVerticalUiKit) uses
+    // justifyContent: 'flex-start' — it cannot be overridden via
+    // tabBarItemStyle which targets the outer wrapper, not the Pressable.
+    // tabBarButton is the documented way to replace that inner Pressable.
+    tabBarButton: (props: any) => (
+      <TouchableOpacity
+        {...props}
+        style={[props.style, styles.tabBarButton]}
+      />
+    ),
     tabBarIcon: ({color, size}: {color: string; size: number}) =>
       getTabIcon(route.name, color, size),
   };
-}
-
-function ChatTabScreen() {
-  return (
-    <PostQueueProvider>
-      <ChatNavigator />
-    </PostQueueProvider>
-  );
 }
 
 function BottomTabNavigator() {
@@ -116,7 +126,13 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   tabBarItem: {
-    minHeight: 48,
+    flex: 1,
+  },
+  // Replaces the internal Pressable whose justifyContent is hardcoded
+  // to 'flex-start' in the library source (BottomTabItem.tsx tabVerticalUiKit).
+  // This is the correct hook point per React Navigation docs (tabBarButton prop).
+  tabBarButton: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
