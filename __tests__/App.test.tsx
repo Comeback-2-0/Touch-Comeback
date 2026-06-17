@@ -14,7 +14,31 @@ import renderer, {act} from 'react-test-renderer';
 import SplashScreen from 'react-native-splash-screen';
 import App from '../App';
 
+jest.mock('react-native', () => {
+  const TestReact = require('react');
+  const actual = jest.requireActual('react-native');
+  const MockStatusBar = (props: Record<string, unknown>) =>
+    TestReact.createElement(actual.View, {testID: 'mock-status-bar', ...props});
+
+  return new Proxy(actual, {
+    get(target, property) {
+      if (property === 'StatusBar') return MockStatusBar;
+      return target[property];
+    },
+  });
+});
+
 jest.mock('../app/utils/googleConfig', () => ({}));
+
+jest.mock('react-native-safe-area-context', () => {
+  const {View} = require('react-native');
+
+  return {
+    SafeAreaProvider: ({children}: {children: React.ReactNode}) => (
+      <View>{children}</View>
+    ),
+  };
+});
 
 jest.mock('react-native-splash-screen', () => ({
   hide: jest.fn(),

@@ -6,6 +6,7 @@ import EditProfile from '../app/screens/EditProfile';
 import {useCurrentProfile} from '../app/features/profile/hooks/useCurrentProfile';
 import {useCompleteProfile, useUpdateProfile, useUploadProfilePicture} from '../app/features/profile/hooks/useProfileMutations';
 import {useAuth} from '../app/context/AuthContext';
+import {useUserPosts} from '../app/features/posts/hooks/useUserPosts';
 
 const mockCompleteProfile = jest.fn();
 const mockUpdateProfile = jest.fn();
@@ -44,6 +45,10 @@ jest.mock('../app/features/profile/hooks/useProfileImagePicker', () => ({
   }),
 }));
 
+jest.mock('../app/features/posts/hooks/useUserPosts', () => ({
+  useUserPosts: jest.fn(),
+}));
+
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: jest.fn(),
@@ -57,6 +62,11 @@ jest.mock('react-native-vector-icons/Ionicons', () => {
 });
 
 jest.mock('react-native-vector-icons/Feather', () => {
+  const {Text} = require('react-native');
+  return ({name}: {name: string}) => <Text>{name}</Text>;
+});
+
+jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
   const {Text} = require('react-native');
   return ({name}: {name: string}) => <Text>{name}</Text>;
 });
@@ -92,6 +102,13 @@ describe('profile screens', () => {
       data: profile,
       isLoading: false,
       isError: false,
+      refetch: jest.fn(),
+    } as any);
+    jest.mocked(useUserPosts).mockReturnValue({
+      data: {posts: [], nextCursor: null},
+      isLoading: false,
+      isError: false,
+      isRefetching: false,
       refetch: jest.fn(),
     } as any);
     mockCompleteProfile.mockResolvedValue(profile);

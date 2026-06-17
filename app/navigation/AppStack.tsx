@@ -10,22 +10,25 @@ import Feather from 'react-native-vector-icons/Feather';
 // PostQueueProvider import preserved — will be restored when Community is ready
 // import { PostQueueProvider } from '../context/PostQueueContext';
 
-import {
-  HomeComingSoon,
-  SearchComingSoon,
-  CommunityComingSoon,
-  ReelsComingSoon,
-} from '../screens/coming-soon';
+import SearchComingSoon from '../screens/coming-soon/SearchComingSoon';
+import CommunityComingSoon from '../screens/coming-soon/CommunityComingSoon';
+import ReelsComingSoon from '../screens/coming-soon/ReelsComingSoon';
+import HomeScreen from '../screens/HomeScreen';
 import ProfileStack from './ProfileStack';
 import PostReelStack from './PostReelsStack';
 import EditProfile from '../screens/EditProfile';
 import SettingsStack from './SettingsStack';
+import CreatePostScreen from '../screens/CreatePostScreen';
+import NotificationsPlaceholderScreen from '../screens/NotificationsPlaceholderScreen';
+import type {LocalPostImage} from '../features/posts/types';
 
 export type AppStackParamList = {
   MainTabs: undefined;
   PostReels: undefined;
   EditProfile: undefined;
   Settings: undefined;
+  CreatePost: {images: LocalPostImage[]};
+  Notifications: undefined;
 };
 
 export type MainTabParamList = {
@@ -94,7 +97,7 @@ function getTabScreenOptions({
 function BottomTabNavigator() {
   return (
     <Tab.Navigator screenOptions={getTabScreenOptions}>
-      <Tab.Screen name="Home" component={HomeComingSoon} />
+      <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="SearchBar" component={SearchComingSoon} />
       <Tab.Screen name="ChatTab" component={CommunityComingSoon} />
       <Tab.Screen name="Reels" component={ReelsComingSoon} />
@@ -109,6 +112,8 @@ export default function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
+      <Stack.Screen name="CreatePost" component={CreatePostScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsPlaceholderScreen} />
       <Stack.Screen name="PostReels" component={PostReelStack} />
       <Stack.Screen
         name="EditProfile"

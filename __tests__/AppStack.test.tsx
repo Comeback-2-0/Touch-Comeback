@@ -65,13 +65,18 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 0, right: 0, bottom: 24, left: 0}),
 }));
 
-jest.mock('../app/screens/Feed', () => () => null);
+jest.mock('../app/screens/HomeScreen', () => () => null);
+jest.mock('../app/screens/coming-soon/SearchComingSoon', () => () => null);
+jest.mock('../app/screens/coming-soon/CommunityComingSoon', () => () => null);
+jest.mock('../app/screens/coming-soon/ReelsComingSoon', () => () => null);
 jest.mock('../app/screens/ReelScreen', () => () => null);
 jest.mock('../app/screens/SearchBar', () => () => null);
 jest.mock('../app/navigation/ProfileStack', () => () => null);
 jest.mock('../app/navigation/ChatNavigator', () => () => null);
 jest.mock('../app/navigation/PostReelsStack', () => () => null);
 jest.mock('../app/screens/EditProfile', () => () => null);
+jest.mock('../app/screens/CreatePostScreen', () => () => null);
+jest.mock('../app/screens/NotificationsPlaceholderScreen', () => () => null);
 jest.mock('../app/navigation/SettingsStack', () => () => null);
 jest.mock('../app/context/PostQueueContext', () => ({
   PostQueueProvider: ({children}: {children: React.ReactNode}) => <>{children}</>,
@@ -92,8 +97,9 @@ describe('AppStack', () => {
     });
 
     expect(mockNativeScreens).toEqual(
-      expect.arrayContaining(['MainTabs', 'PostReels', 'EditProfile', 'Settings']),
+      expect.arrayContaining(['MainTabs', 'CreatePost', 'PostReels', 'EditProfile', 'Settings']),
     );
+    expect(mockNativeScreens).toContain('Notifications');
     expect(mockTabScreens).toContain('ProfileTab');
     expect(mockTabScreens).not.toContain('EditProfile');
     expect(mockTabScreens).not.toContain('Settings');

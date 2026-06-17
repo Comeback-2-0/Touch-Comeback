@@ -18,7 +18,7 @@ import type {AppStackParamList} from '../navigation/AppStack';
 import {useCurrentProfile} from '../features/profile/hooks/useCurrentProfile';
 import ProfileStats from '../features/profile/components/ProfileStats';
 import ProfileStatusPill from '../features/profile/components/ProfileStatusPill';
-import ProfilePlaceholderTabs from '../features/profile/components/ProfilePlaceholderTabs';
+import ProfilePostsSection from '../features/posts/components/ProfilePostsSection';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
 
@@ -99,7 +99,7 @@ export default function ProfileScreen() {
           <Text style={styles.editLabel}>Edit Profile</Text>
         </Pressable>
 
-        <ProfilePlaceholderTabs />
+        <ProfilePostsSection userId={profile.id} />
       </ScrollView>
     </SafeAreaView>
   );

@@ -3,10 +3,6 @@
   "compilerOptions": {
     "jsx": "react-native",  // Override or add extra settings
     "strict": true,
-    "baseUrl": "app/src",
-    "paths": {
-      "@icons/*": ["assets/icons/*"],
-    },
     "types": ["react-native", "jest"]
   },
   "include": ["**/*.ts", "**/*.tsx"],
