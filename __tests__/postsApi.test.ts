@@ -1,7 +1,10 @@
 import {
   createPost,
   fetchHomeFeed,
+  fetchPostEngagementStatus,
   fetchUserPosts,
+  likePost,
+  unlikePost,
 } from '../app/features/posts/api/postsApi';
 import {api} from '../app/utils/api';
 
@@ -9,6 +12,7 @@ jest.mock('../app/utils/api', () => ({
   api: {
     get: jest.fn(),
     post: jest.fn(),
+    delete: jest.fn(),
   },
 }));
 
@@ -94,5 +98,22 @@ describe('postsApi', () => {
     expect(mockedApi.get).toHaveBeenNthCalledWith(2, '/posts/user/u1', {
       params: {limit: 12, cursor: undefined},
     });
+  });
+
+  it('likes, unlikes, and fetches engagement status for a post', async () => {
+    mockedApi.post.mockResolvedValueOnce({data: {liked: true, likesCount: 12}});
+    mockedApi.delete.mockResolvedValueOnce({data: {liked: false, likesCount: 11}});
+    mockedApi.get.mockResolvedValueOnce({data: {liked: true, likesCount: 12}});
+
+    await expect(likePost('post-1')).resolves.toEqual({liked: true, likesCount: 12});
+    await expect(unlikePost('post-1')).resolves.toEqual({liked: false, likesCount: 11});
+    await expect(fetchPostEngagementStatus('post-1')).resolves.toEqual({
+      liked: true,
+      likesCount: 12,
+    });
+
+    expect(mockedApi.post).toHaveBeenCalledWith('/posts/post-1/like');
+    expect(mockedApi.delete).toHaveBeenCalledWith('/posts/post-1/like');
+    expect(mockedApi.get).toHaveBeenCalledWith('/posts/post-1/engagement-status');
   });
 });

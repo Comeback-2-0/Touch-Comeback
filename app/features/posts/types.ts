@@ -28,8 +28,16 @@ export type PublicPost = {
     savesCount: number;
     reportsCount: number;
   };
+  viewerEngagement?: {
+    liked: boolean;
+  };
   createdAt: string;
   updatedAt: string;
+};
+
+export type PostEngagementStatus = {
+  liked: boolean;
+  likesCount: number;
 };
 
 export type LocalPostImage = {

@@ -13,6 +13,7 @@ import Feather from 'react-native-vector-icons/Feather';
 import SearchComingSoon from '../screens/coming-soon/SearchComingSoon';
 import CommunityComingSoon from '../screens/coming-soon/CommunityComingSoon';
 import ReelsComingSoon from '../screens/coming-soon/ReelsComingSoon';
+import HomeComingSoon from '../screens/coming-soon/HomeComingSoon';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileStack from './ProfileStack';
 import PostReelStack from './PostReelsStack';

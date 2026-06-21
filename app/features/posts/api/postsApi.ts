@@ -2,6 +2,7 @@ import type {AxiosProgressEvent} from 'axios';
 import {api} from '../../../utils/api';
 import type {
   CreatePostPayload,
+  PostEngagementStatus,
   PostsPage,
   PostsQueryParams,
   PublicPost,
@@ -53,5 +54,20 @@ export async function fetchUserPosts(
       cursor: params.cursor,
     },
   });
+  return response.data;
+}
+
+export async function likePost(postId: string): Promise<PostEngagementStatus> {
+  const response = await api.post<PostEngagementStatus>(`/posts/${postId}/like`);
+  return response.data;
+}
+
+export async function unlikePost(postId: string): Promise<PostEngagementStatus> {
+  const response = await api.delete<PostEngagementStatus>(`/posts/${postId}/like`);
+  return response.data;
+}
+
+export async function fetchPostEngagementStatus(postId: string): Promise<PostEngagementStatus> {
+  const response = await api.get<PostEngagementStatus>(`/posts/${postId}/engagement-status`);
   return response.data;
 }
