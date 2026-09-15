@@ -14,7 +14,6 @@ import SearchComingSoon from '../screens/coming-soon/SearchComingSoon';
 import CommunityComingSoon from '../screens/coming-soon/CommunityComingSoon';
 import ReelsComingSoon from '../screens/coming-soon/ReelsComingSoon';
 import HomeComingSoon from '../screens/coming-soon/HomeComingSoon';
-import HomeScreen from '../screens/HomeScreen';
 import ProfileStack from './ProfileStack';
 import PostReelStack from './PostReelsStack';
 import EditProfile from '../screens/EditProfile';
@@ -98,7 +97,7 @@ function getTabScreenOptions({
 function BottomTabNavigator() {
   return (
     <Tab.Navigator screenOptions={getTabScreenOptions}>
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={HomeComingSoon} />
       <Tab.Screen name="SearchBar" component={SearchComingSoon} />
       <Tab.Screen name="ChatTab" component={CommunityComingSoon} />
       <Tab.Screen name="Reels" component={ReelsComingSoon} />

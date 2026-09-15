@@ -6,6 +6,7 @@ const mockNativeScreens: string[] = [];
 const mockNativeOptions: Record<string, any> = {};
 const mockTabScreens: string[] = [];
 const mockTabIcons: Record<string, string> = {};
+const mockTabComponents: Record<string, React.ComponentType | undefined> = {};
 let mockTabScreenOptions: any;
 
 jest.mock('@react-navigation/native-stack', () => ({
@@ -36,8 +37,9 @@ jest.mock('@react-navigation/bottom-tabs', () => ({
       mockTabScreenOptions = screenOptions;
       return <>{children}</>;
     },
-    Screen: ({name}: {name: string}) => {
+    Screen: ({name, component}: {name: string; component?: React.ComponentType}) => {
       mockTabScreens.push(name);
+      mockTabComponents[name] = component;
       if (mockTabScreenOptions) {
         const options = mockTabScreenOptions({route: {name}});
         const icon = options.tabBarIcon({color: 'black', size: 24});
@@ -65,7 +67,16 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 0, right: 0, bottom: 24, left: 0}),
 }));
 
-jest.mock('../app/screens/HomeScreen', () => () => null);
+jest.mock('../app/screens/HomeScreen', () => {
+  const MockHomeScreen = () => null;
+  MockHomeScreen.displayName = 'MockHomeScreen';
+  return MockHomeScreen;
+});
+jest.mock('../app/screens/coming-soon/HomeComingSoon', () => {
+  const MockHomeComingSoon = () => null;
+  MockHomeComingSoon.displayName = 'MockHomeComingSoon';
+  return MockHomeComingSoon;
+});
 jest.mock('../app/screens/coming-soon/SearchComingSoon', () => () => null);
 jest.mock('../app/screens/coming-soon/CommunityComingSoon', () => () => null);
 jest.mock('../app/screens/coming-soon/ReelsComingSoon', () => () => null);
@@ -87,6 +98,7 @@ describe('AppStack', () => {
     mockNativeScreens.length = 0;
     mockTabScreens.length = 0;
     Object.keys(mockTabIcons).forEach(key => delete mockTabIcons[key]);
+    Object.keys(mockTabComponents).forEach(key => delete mockTabComponents[key]);
     mockTabScreenOptions = undefined;
     Object.keys(mockNativeOptions).forEach(key => delete mockNativeOptions[key]);
   });
@@ -120,6 +132,14 @@ describe('AppStack', () => {
       Reels: 'Feather:smartphone',
       ProfileTab: 'Feather:user',
     });
+  });
+
+  it('uses the animated home placeholder for the Home tab', () => {
+    act(() => {
+      renderer.create(<AppStack />);
+    });
+
+    expect(mockTabComponents.Home?.displayName).toBe('MockHomeComingSoon');
   });
 
   it('does not add safe-area inset into tab bar height manually', () => {
