@@ -79,6 +79,7 @@ jest.mock('../app/screens/coming-soon/HomeComingSoon', () => {
 });
 jest.mock('../app/screens/coming-soon/SearchComingSoon', () => () => null);
 jest.mock('../app/screens/coming-soon/CommunityComingSoon', () => () => null);
+jest.mock('../app/navigation/CommunityStack', () => () => null);
 jest.mock('../app/screens/coming-soon/ReelsComingSoon', () => () => null);
 jest.mock('../app/screens/ReelScreen', () => () => null);
 jest.mock('../app/screens/SearchBar', () => () => null);

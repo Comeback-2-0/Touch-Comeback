@@ -35,6 +35,37 @@ export type PublicPost = {
   updatedAt: string;
 };
 
+export type PostReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'hate'
+  | 'sexual_content'
+  | 'violence'
+  | 'scam'
+  | 'misleading'
+  | 'other';
+
+export type ReportPostPayload = {
+  reason: PostReportReason;
+  details?: string;
+};
+
+export type PostModerationState = {
+  isFlagged: boolean;
+  reviewStatus: 'none' | 'pending' | 'approved' | 'rejected';
+};
+
+export type PostReportResponse = {
+  reported: boolean;
+  status: 'open' | 'withdrawn';
+  reportsCount: number;
+  moderation: PostModerationState;
+};
+
+export type PostHiddenResponse = {
+  hidden: boolean;
+};
+
 export type PostEngagementStatus = {
   liked: boolean;
   likesCount: number;

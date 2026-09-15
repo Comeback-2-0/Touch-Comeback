@@ -4,7 +4,11 @@ import {
   fetchPostEngagementStatus,
   fetchUserPosts,
   likePost,
+  markPostNotInterested,
+  reportPost,
+  undoPostNotInterested,
   unlikePost,
+  withdrawPostReport,
 } from '../app/features/posts/api/postsApi';
 import {api} from '../app/utils/api';
 
@@ -115,5 +119,39 @@ describe('postsApi', () => {
     expect(mockedApi.post).toHaveBeenCalledWith('/posts/post-1/like');
     expect(mockedApi.delete).toHaveBeenCalledWith('/posts/post-1/like');
     expect(mockedApi.get).toHaveBeenCalledWith('/posts/post-1/engagement-status');
+  });
+
+  it('reports, withdraws report, hides, and unhides a post', async () => {
+    const reportResponse = {
+      reported: true,
+      status: 'open',
+      reportsCount: 1,
+      moderation: {isFlagged: true, reviewStatus: 'pending'},
+    };
+    const withdrawResponse = {
+      reported: false,
+      status: 'withdrawn',
+      reportsCount: 0,
+      moderation: {isFlagged: false, reviewStatus: 'none'},
+    };
+    mockedApi.post.mockResolvedValueOnce({data: reportResponse});
+    mockedApi.delete.mockResolvedValueOnce({data: withdrawResponse});
+    mockedApi.post.mockResolvedValueOnce({data: {hidden: true}});
+    mockedApi.delete.mockResolvedValueOnce({data: {hidden: false}});
+
+    await expect(reportPost('post-1', {reason: 'spam', details: 'Bad post'})).resolves.toEqual(
+      reportResponse,
+    );
+    await expect(withdrawPostReport('post-1')).resolves.toEqual(withdrawResponse);
+    await expect(markPostNotInterested('post-1')).resolves.toEqual({hidden: true});
+    await expect(undoPostNotInterested('post-1')).resolves.toEqual({hidden: false});
+
+    expect(mockedApi.post).toHaveBeenNthCalledWith(1, '/posts/post-1/report', {
+      reason: 'spam',
+      details: 'Bad post',
+    });
+    expect(mockedApi.delete).toHaveBeenNthCalledWith(1, '/posts/post-1/report');
+    expect(mockedApi.post).toHaveBeenNthCalledWith(2, '/posts/post-1/not-interested');
+    expect(mockedApi.delete).toHaveBeenNthCalledWith(2, '/posts/post-1/not-interested');
   });
 });

@@ -2,10 +2,13 @@ import type {AxiosProgressEvent} from 'axios';
 import {api} from '../../../utils/api';
 import type {
   CreatePostPayload,
+  PostHiddenResponse,
   PostEngagementStatus,
+  PostReportResponse,
   PostsPage,
   PostsQueryParams,
   PublicPost,
+  ReportPostPayload,
 } from '../types';
 
 type PostResponse = {
@@ -69,5 +72,28 @@ export async function unlikePost(postId: string): Promise<PostEngagementStatus> 
 
 export async function fetchPostEngagementStatus(postId: string): Promise<PostEngagementStatus> {
   const response = await api.get<PostEngagementStatus>(`/posts/${postId}/engagement-status`);
+  return response.data;
+}
+
+export async function reportPost(
+  postId: string,
+  payload: ReportPostPayload,
+): Promise<PostReportResponse> {
+  const response = await api.post<PostReportResponse>(`/posts/${postId}/report`, payload);
+  return response.data;
+}
+
+export async function withdrawPostReport(postId: string): Promise<PostReportResponse> {
+  const response = await api.delete<PostReportResponse>(`/posts/${postId}/report`);
+  return response.data;
+}
+
+export async function markPostNotInterested(postId: string): Promise<PostHiddenResponse> {
+  const response = await api.post<PostHiddenResponse>(`/posts/${postId}/not-interested`);
+  return response.data;
+}
+
+export async function undoPostNotInterested(postId: string): Promise<PostHiddenResponse> {
+  const response = await api.delete<PostHiddenResponse>(`/posts/${postId}/not-interested`);
   return response.data;
 }

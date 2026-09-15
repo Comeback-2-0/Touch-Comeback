@@ -11,7 +11,7 @@ import Feather from 'react-native-vector-icons/Feather';
 // import { PostQueueProvider } from '../context/PostQueueContext';
 
 import SearchComingSoon from '../screens/coming-soon/SearchComingSoon';
-import CommunityComingSoon from '../screens/coming-soon/CommunityComingSoon';
+import CommunityStack from './CommunityStack';
 import ReelsComingSoon from '../screens/coming-soon/ReelsComingSoon';
 import HomeComingSoon from '../screens/coming-soon/HomeComingSoon';
 import ProfileStack from './ProfileStack';
@@ -99,7 +99,7 @@ function BottomTabNavigator() {
     <Tab.Navigator screenOptions={getTabScreenOptions}>
       <Tab.Screen name="Home" component={HomeComingSoon} />
       <Tab.Screen name="SearchBar" component={SearchComingSoon} />
-      <Tab.Screen name="ChatTab" component={CommunityComingSoon} />
+      <Tab.Screen name="ChatTab" component={CommunityStack} />
       <Tab.Screen name="Reels" component={ReelsComingSoon} />
       <Tab.Screen name="ProfileTab" component={ProfileStack} />
     </Tab.Navigator>
