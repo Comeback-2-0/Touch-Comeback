@@ -38,6 +38,18 @@ type JoinRequest = {
   revealedUsername?: string;
 };
 
+function ScreenHeader({title, onBack}: {title: string; onBack: () => void}) {
+  return (
+    <View style={styles.header}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} style={styles.iconButton}>
+        <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
+      </Pressable>
+      <Text numberOfLines={1} style={styles.head}>{title}</Text>
+      <View style={styles.headerSpacer} />
+    </View>
+  );
+}
+
 export default function CommunityHomeScreen() {
   const navigation = useNavigation<Navigation>();
   const {params: {community: routeCommunity}} = useRoute<Route>();
@@ -53,17 +65,20 @@ export default function CommunityHomeScreen() {
   const [joinRequest, setJoinRequest] = useState<JoinRequest | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   const joined = membership?.status === 'active';
   const manager = ['owner', 'moderator'].includes(membership?.role);
   const pending = joinRequest?.status === 'pending';
   const declined = joinRequest?.status === 'declined';
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({refresh = false} = {}) => {
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
     setError(false);
     try {
       const info = await api.get(`/communities/${id}`);
@@ -83,6 +98,7 @@ export default function CommunityHomeScreen() {
       setError(true);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [id, routeCommunity]);
 
@@ -104,6 +120,10 @@ export default function CommunityHomeScreen() {
       setSheetOpen(true);
       return;
     }
+    if (community?.joinMode === 'invite-only') {
+      navigation.navigate('CommunityInvite', {community});
+      return;
+    }
     joinOpen();
   };
 
@@ -112,6 +132,7 @@ export default function CommunityHomeScreen() {
     alias: string;
     revealUsername: boolean;
     username: string;
+    note: string;
   }) => {
     setSending(true);
     try {
@@ -142,16 +163,42 @@ export default function CommunityHomeScreen() {
   const memberOptions = () =>
     Alert.alert('Community options', '', [
       {
-        text: 'Mute notifications',
-        onPress: () => api.put(`/communities/${id}/mute`, {muted: true}),
+        text: muted ? 'Unmute notifications' : 'Mute notifications',
+        onPress: async () => {
+          try {
+            const nextMuted = !muted;
+            await api.put(`/communities/${id}/mute`, {muted: nextMuted});
+            setMuted(nextMuted);
+          } catch {
+            Alert.alert('Could not update notifications', 'Please try again.');
+          }
+        },
       },
       {
         text: 'Leave community',
         style: 'destructive',
-        onPress: async () => {
-          await api.post(`/communities/${id}/leave`);
-          navigation.goBack();
-        },
+        onPress: () =>
+          Alert.alert(
+            'Leave community?',
+            community?.contentVisibility === 'members'
+              ? 'You may need approval or an invite to come back.'
+              : 'You can join again later.',
+            [
+              {text: 'Cancel', style: 'cancel'},
+              {
+                text: 'Leave',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await api.post(`/communities/${id}/leave`);
+                    navigation.goBack();
+                  } catch {
+                    Alert.alert('Could not leave community', 'Please try again.');
+                  }
+                },
+              },
+            ],
+          ),
       },
       {text: 'Cancel', style: 'cancel'},
     ]);
@@ -173,9 +220,20 @@ export default function CommunityHomeScreen() {
       return (
         <View style={styles.statusBox}>
           <Text style={styles.statusTitle}>Declined</Text>
-          <Text style={styles.copy}>You can ask again with a different alias or username.</Text>
+          <Text style={styles.copy}>Your request was not approved this time.</Text>
           <Pressable onPress={() => setSheetOpen(true)} style={styles.button}>
             <Text style={styles.buttonText}>Request again</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    if (community?.joinMode === 'invite-only') {
+      return (
+        <View style={styles.statusBox}>
+          <Text style={styles.statusTitle}>Invite required</Text>
+          <Text style={styles.copy}>Ask a member or moderator for a private invite link.</Text>
+          <Pressable onPress={() => navigation.navigate('CommunityInvite', {community})} style={styles.button}>
+            <Text style={styles.buttonText}>Enter invite code</Text>
           </Pressable>
         </View>
       );
@@ -192,6 +250,7 @@ export default function CommunityHomeScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
+        <ScreenHeader title={community?.name || 'Community'} onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <ActivityIndicator color={pastelColors.accent} />
         </View>
@@ -202,9 +261,10 @@ export default function CommunityHomeScreen() {
   if (error) {
     return (
       <SafeAreaView style={styles.safe}>
+        <ScreenHeader title={community?.name || 'Community'} onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <Text style={styles.title}>Could not load this community</Text>
-          <Pressable onPress={load} style={styles.button}>
+          <Pressable onPress={() => load()} style={styles.button}>
             <Text style={styles.buttonText}>Retry</Text>
           </Pressable>
         </View>
@@ -215,6 +275,7 @@ export default function CommunityHomeScreen() {
   if (community?.contentVisibility === 'members' && !joined) {
     return (
       <SafeAreaView style={styles.safe}>
+        <ScreenHeader title={community.name} onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <Feather name="lock" size={28} color={pastelColors.accent} />
           <Text style={styles.title}>{community.name}</Text>
@@ -237,13 +298,15 @@ export default function CommunityHomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.iconButton}>
           <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
         </Pressable>
         <Text style={styles.head}>{community.name}</Text>
         <View style={styles.actions}>
           {manager ? (
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Manage community"
               onPress={() => navigation.navigate('CommunityManage', {community})}
               style={styles.manageButton}>
               <Feather name="settings" size={20} color={pastelColors.auth.deepText} />
@@ -255,17 +318,17 @@ export default function CommunityHomeScreen() {
             </Pressable>
           ) : null}
           {joined ? (
-            <Pressable onPress={memberOptions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Community options" onPress={memberOptions} style={styles.iconButton}>
               <Feather name="more-horizontal" size={20} color={pastelColors.auth.deepText} />
             </Pressable>
           ) : null}
           {joined ? (
-            <Pressable onPress={() => navigation.navigate('CommunityQueue', {community})}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Review queue" onPress={() => navigation.navigate('CommunityQueue', {community})} style={styles.iconButton}>
               <Feather name="list" size={20} color={pastelColors.auth.deepText} />
             </Pressable>
           ) : null}
           {joined ? (
-            <Pressable onPress={() => navigation.navigate('CommunityCompose', {community})}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Submit post" onPress={() => navigation.navigate('CommunityCompose', {community})} style={styles.iconButton}>
               <Feather name="plus-square" size={21} color={pastelColors.auth.deepText} />
             </Pressable>
           ) : null}
@@ -275,8 +338,8 @@ export default function CommunityHomeScreen() {
       <FlatList
         data={posts}
         keyExtractor={p => p.id}
-        refreshing={loading}
-        onRefresh={load}
+        refreshing={refreshing}
+        onRefresh={() => load({refresh: true})}
         contentContainerStyle={posts.length ? styles.list : styles.empty}
         ListHeaderComponent={
           <View style={styles.about}>
@@ -331,8 +394,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   head: {maxWidth: '50%', fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
-  actions: {flexDirection: 'row', gap: 16, alignItems: 'center'},
-  manageButton: {position: 'relative', padding: 2},
+  headerSpacer: {width: 48},
+  iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
+  actions: {flexDirection: 'row', alignItems: 'center'},
+  manageButton: {position: 'relative', height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
   badge: {
     position: 'absolute',
     top: -4,

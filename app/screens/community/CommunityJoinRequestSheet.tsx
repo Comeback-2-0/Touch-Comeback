@@ -20,6 +20,7 @@ type Props = {
     alias: string;
     revealUsername: boolean;
     username: string;
+    note: string;
   }) => void;
 };
 
@@ -41,6 +42,7 @@ export default function CommunityJoinRequestSheet({
   const [useAlias, setUseAlias] = useState(true);
   const [revealUsername, setRevealUsername] = useState(false);
   const [alias, setAlias] = useState(suggestAlias());
+  const [note, setNote] = useState('');
   const displayUsername = username.trim().replace(/^@/, '');
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export default function CommunityJoinRequestSheet({
       setUseAlias(true);
       setRevealUsername(false);
       setAlias(suggestAlias());
+      setNote('');
     }
   }, [visible]);
 
@@ -64,7 +67,7 @@ export default function CommunityJoinRequestSheet({
         <View style={styles.sheet}>
           <Text style={styles.title}>Ask to join</Text>
           <Text style={styles.copy}>
-            Admins decide who gets in. Choose what they can see about you.
+            Moderators see only what you choose here. The community will not see this request.
           </Text>
 
           <View style={styles.row}>
@@ -104,6 +107,25 @@ export default function CommunityJoinRequestSheet({
             />
           </View>
 
+          <TextInput
+            accessibilityLabel="Join request note"
+            value={note}
+            onChangeText={setNote}
+            placeholder="Optional note to moderators"
+            placeholderTextColor={pastelColors.auth.mutedText}
+            multiline
+            style={[styles.input, styles.noteInput]}
+          />
+
+          <View style={styles.preview}>
+            <Text style={styles.previewLabel}>Moderators will see</Text>
+            <Text style={styles.previewText}>
+              {useAlias ? `Alias: ${alias.trim() || 'required'}` : 'No alias'}
+              {revealUsername ? ` · @${displayUsername}` : ''}
+              {note.trim() ? ' · Note included' : ''}
+            </Text>
+          </View>
+
           {!canSend ? (
             <Text style={styles.hint}>Turn on an alias, your username, or both.</Text>
           ) : null}
@@ -118,6 +140,7 @@ export default function CommunityJoinRequestSheet({
                 alias: alias.trim(),
                 revealUsername,
                 username: displayUsername,
+                note: note.trim(),
               })
             }
             style={[styles.button, (!canSend || submitting) && styles.disabled]}>
@@ -177,6 +200,21 @@ const styles = StyleSheet.create({
     backgroundColor: pastelColors.white,
     color: pastelColors.auth.deepText,
     fontWeight: '700',
+  },
+  noteInput: {minHeight: 78, textAlignVertical: 'top'},
+  preview: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: pastelColors.auth.glassSurface,
+  },
+  previewLabel: {color: pastelColors.auth.deepText, fontWeight: '900'},
+  previewText: {
+    marginTop: 4,
+    color: pastelColors.auth.mutedText,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   hint: {
     marginTop: 12,

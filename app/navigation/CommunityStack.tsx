@@ -8,6 +8,7 @@ import CommunityQueueScreen from '../screens/community/CommunityQueueScreen';
 import CommunityCreateScreen from '../screens/community/CommunityCreateScreen';
 import CommunityPostScreen from '../screens/community/CommunityPostScreen';
 import CommunityManageScreen from '../screens/community/CommunityManageScreen';
+import CommunityInviteScreen from '../screens/community/CommunityInviteScreen';
 
 export type CommunitySummary = {
   id: string;
@@ -28,6 +29,7 @@ export type CommunityStackParamList = {
   CommunityCreate: undefined;
   CommunityPost: {community: CommunitySummary; contentId: string};
   CommunityManage: {community: CommunitySummary};
+  CommunityInvite: {community: CommunitySummary};
 };
 
 const Stack = createNativeStackNavigator<CommunityStackParamList>();
@@ -48,6 +50,7 @@ export default function CommunityStack() {
       <Stack.Screen name="CommunityCreate" component={CommunityCreateScreen} />
       <Stack.Screen name="CommunityPost" component={CommunityPostScreen} />
       <Stack.Screen name="CommunityManage" component={CommunityManageScreen} />
+      <Stack.Screen name="CommunityInvite" component={CommunityInviteScreen} />
     </Stack.Navigator>
   );
 }

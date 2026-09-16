@@ -38,16 +38,23 @@ export default function CommunityQueueScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({refresh = false} = {}) => {
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
+    setError('');
     try {
       const r = await api.get(`/communities/${communityId}/content/queue`);
       setPosts(r.data.posts || []);
       setCanManage(Boolean(r.data.canManage));
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Could not load review queue');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [communityId]);
 
@@ -60,9 +67,7 @@ export default function CommunityQueueScreen() {
       const r = await api.post(`/communities/${communityId}/content/${id}/vote`, {value});
       const updated = r.data.post;
       setPosts(current =>
-        current
-          .map(post => (post.id === id ? {...post, ...updated} : post))
-          .sort((a, b) => b.score - a.score),
+        current.map(post => (post.id === id ? {...post, ...updated} : post)),
       );
     } catch {
       Alert.alert('Could not vote', 'Please try again.');
@@ -124,7 +129,20 @@ export default function CommunityQueueScreen() {
         <FlatList
           data={posts}
           keyExtractor={p => p.id}
+          refreshing={refreshing}
+          onRefresh={() => load({refresh: true})}
           contentContainerStyle={posts.length ? styles.list : styles.empty}
+          ListHeaderComponent={
+            <View style={styles.queueInfo}>
+              <Text style={styles.queueInfoTitle}>
+                {canManage ? 'Votes help you choose what to publish.' : 'Votes help moderators choose what to publish.'}
+              </Text>
+              <Text style={styles.queueInfoCopy}>
+                Posts stay in place after your vote and reorder when the queue refreshes.
+              </Text>
+              {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+            </View>
+          }
           renderItem={({item}) => (
             <View style={styles.card}>
               <CommunityPostCard
@@ -179,7 +197,16 @@ const styles = StyleSheet.create({
   headerSpacer: {width: 72},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center'},
   list: {padding: 16, paddingBottom: 28},
-  empty: {flexGrow: 1},
+  empty: {flexGrow: 1, padding: 16},
+  queueInfo: {
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: pastelColors.auth.glassSurface,
+  },
+  queueInfoTitle: {fontWeight: '900', color: pastelColors.auth.deepText},
+  queueInfoCopy: {marginTop: 4, color: pastelColors.auth.mutedText, fontWeight: '700', lineHeight: 18},
+  inlineError: {marginTop: 8, color: pastelColors.accent, fontWeight: '800'},
   card: {
     marginBottom: 14,
     borderRadius: 18,

@@ -84,7 +84,6 @@ jest.mock('../app/screens/coming-soon/ReelsComingSoon', () => () => null);
 jest.mock('../app/screens/ReelScreen', () => () => null);
 jest.mock('../app/screens/SearchBar', () => () => null);
 jest.mock('../app/navigation/ProfileStack', () => () => null);
-jest.mock('../app/navigation/ChatNavigator', () => () => null);
 jest.mock('../app/navigation/PostReelsStack', () => () => null);
 jest.mock('../app/screens/EditProfile', () => () => null);
 jest.mock('../app/screens/CreatePostScreen', () => () => null);

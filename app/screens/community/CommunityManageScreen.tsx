@@ -4,6 +4,7 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -27,6 +28,22 @@ type JoinRequest = {
   status: string;
   createdAt?: string;
 };
+type ReportItem = {
+  id: string;
+  contentId: string;
+  postAlias?: string;
+  postText?: string;
+  reason: string;
+  context?: string;
+  createdAt?: string;
+};
+type MemberItem = {
+  userId: string;
+  role: 'owner' | 'moderator' | 'member' | string;
+  status: string;
+  joinedAt?: string;
+};
+type OwnershipTransfer = {id: string; createdAt?: string; status: string};
 
 type ScheduleType = 'daily' | 'interval' | 'slots';
 
@@ -64,9 +81,21 @@ export default function CommunityManageScreen() {
 
   const [community, setCommunity] = useState<any>(routeCommunity);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
+  const [reports, setReports] = useState<ReportItem[]>([]);
+  const [members, setMembers] = useState<MemberItem[]>([]);
+  const [transfers, setTransfers] = useState<OwnershipTransfer[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
+
+  const [name, setName] = useState(routeCommunity.name || '');
+  const [description, setDescription] = useState(routeCommunity.description || '');
+  const [image, setImage] = useState(routeCommunity.image || '');
+  const [rules, setRules] = useState('');
+  const [contentVisibility, setContentVisibility] = useState<'public' | 'members'>('public');
+  const [joinMode, setJoinMode] = useState<'open' | 'approval' | 'invite-only'>('open');
+  const [showLeadership, setShowLeadership] = useState(false);
 
   const [autoPublish, setAutoPublish] = useState(false);
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily');
@@ -98,25 +127,46 @@ export default function CommunityManageScreen() {
     setEveryDays(String(schedule.everyDays || 1));
   }, []);
 
+  const applySettingsFromCommunity = useCallback((next: any) => {
+    setName(next?.name || '');
+    setDescription(next?.description || '');
+    setImage(next?.image || '');
+    setRules(next?.rules || '');
+    setContentVisibility(next?.contentVisibility === 'members' ? 'members' : 'public');
+    setJoinMode(
+      ['open', 'approval', 'invite-only'].includes(next?.joinMode)
+        ? next.joinMode
+        : 'open',
+    );
+    setShowLeadership(Boolean(next?.showLeadership));
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [info, join, audit] = await Promise.all([
+      const [info, join, memberList, transferList, reportList, audit] = await Promise.all([
         api.get(`/communities/${id}`),
         api.get(`/communities/${id}/join-requests`),
+        api.get(`/communities/${id}/members`),
+        api.get(`/communities/${id}/ownership-transfers/pending`),
+        api.get(`/communities/${id}/content/reports`),
         api.get(`/communities/${id}/audit`),
       ]);
       const nextCommunity = info.data.community || routeCommunity;
       setCommunity(nextCommunity);
+      applySettingsFromCommunity(nextCommunity);
       applyScheduleFromCommunity(nextCommunity);
       setRequests(join.data.requests || []);
+      setMembers(memberList.data.members || []);
+      setTransfers(transferList.data.transfers || []);
+      setReports(reportList.data.reports || []);
       setEvents(audit.data.events || []);
     } catch {
       Alert.alert('Could not load management tools');
     } finally {
       setLoading(false);
     }
-  }, [applyScheduleFromCommunity, id, routeCommunity]);
+  }, [applyScheduleFromCommunity, applySettingsFromCommunity, id, routeCommunity]);
 
   useEffect(() => {
     load();
@@ -132,8 +182,90 @@ export default function CommunityManageScreen() {
   };
 
   const invite = async () => {
-    const r = await api.post(`/communities/${id}/invites`, {});
-    Alert.alert('Invite link', `Share this token privately: ${r.data.token}`);
+    try {
+      const r = await api.post(`/communities/${id}/invites`, {});
+      const token = r.data.token;
+      await Share.share({
+        message: `Touch invite for ${community.name}: ${token}`,
+      });
+    } catch {
+      Alert.alert('Could not create invite', 'Please try again.');
+    }
+  };
+
+  const saveSettings = async () => {
+    if (!name.trim()) {
+      Alert.alert('Name required', 'Community name cannot be empty.');
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      const response = await api.put(`/communities/${id}`, {
+        name: name.trim(),
+        description: description.trim(),
+        image: image.trim(),
+        rules: rules.trim(),
+        contentVisibility,
+        joinMode,
+        showLeadership,
+        queueMode: community.queueMode || 'manual',
+        queueSchedule: community.queueSchedule || null,
+        queueScheduleMinutes: community.queueScheduleMinutes || null,
+      });
+      setCommunity(response.data.community);
+      applySettingsFromCommunity(response.data.community);
+      Alert.alert('Saved', 'Community settings updated.');
+    } catch (err: any) {
+      Alert.alert('Could not save settings', err?.response?.data?.error || 'Please try again.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const moderateContent = async (contentId: string, action: 'remove' | 'restore') => {
+    try {
+      await api.put(`/communities/${id}/content/${contentId}/moderation`, {action});
+      await load();
+    } catch {
+      Alert.alert('Could not update report');
+    }
+  };
+
+  const updateRole = async (member: MemberItem, role: 'member' | 'moderator') => {
+    try {
+      await api.put(`/communities/${id}/members/${member.userId}/role`, {role});
+      await load();
+    } catch (err: any) {
+      Alert.alert('Could not update role', err?.response?.data?.error || 'Please try again.');
+    }
+  };
+
+  const requestTransfer = async (member: MemberItem) => {
+    Alert.alert('Transfer ownership?', 'The member must accept before ownership changes. You become moderator after acceptance.', [
+      {text: 'Cancel', style: 'cancel'},
+      {
+        text: 'Nominate',
+        onPress: async () => {
+          try {
+            await api.post(`/communities/${id}/ownership-transfers`, {toUserId: member.userId});
+            Alert.alert('Transfer requested', 'Ownership changes only after the member accepts.');
+            await load();
+          } catch (err: any) {
+            Alert.alert('Could not request transfer', err?.response?.data?.error || 'Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const acceptTransfer = async (transfer: OwnershipTransfer) => {
+    try {
+      await api.post(`/communities/${id}/ownership-transfers/${transfer.id}/accept`);
+      Alert.alert('Ownership accepted', 'You are now the owner.');
+      await load();
+    } catch (err: any) {
+      Alert.alert('Could not accept ownership', err?.response?.data?.error || 'Please try again.');
+    }
   };
 
   const saveSchedule = async () => {
@@ -219,6 +351,60 @@ export default function CommunityManageScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {transfers.length ? (
+          <>
+            <Text style={styles.section}>Ownership transfer</Text>
+            {transfers.map(transfer => (
+              <View style={styles.card} key={transfer.id}>
+                <Text style={styles.alias}>You were nominated as owner</Text>
+                {transfer.createdAt ? <Text style={styles.meta}>Requested {new Date(transfer.createdAt).toLocaleString()}</Text> : null}
+                <Pressable onPress={() => acceptTransfer(transfer)} style={[styles.primary, styles.fullButton]}>
+                  <Text style={styles.primaryText}>Accept ownership</Text>
+                </Pressable>
+              </View>
+            ))}
+          </>
+        ) : null}
+
+        <Text style={styles.section}>Community settings</Text>
+        <Text style={styles.lead}>Update what people see before joining and how they get in.</Text>
+        <View style={styles.scheduleCard}>
+          <Text style={styles.label}>Name</Text>
+          <TextInput value={name} onChangeText={setName} style={styles.input} placeholder="Community name" placeholderTextColor={pastelColors.auth.mutedText} />
+          <Text style={styles.label}>Image URL</Text>
+          <TextInput value={image} onChangeText={setImage} style={styles.input} placeholder="https://..." placeholderTextColor={pastelColors.auth.mutedText} autoCapitalize="none" />
+          <Text style={styles.label}>Description</Text>
+          <TextInput value={description} onChangeText={setDescription} style={[styles.input, styles.largeInput]} placeholder="What is this space for?" placeholderTextColor={pastelColors.auth.mutedText} multiline />
+          <Text style={styles.label}>Rules</Text>
+          <TextInput value={rules} onChangeText={setRules} style={[styles.input, styles.largeInput]} placeholder="What should members know?" placeholderTextColor={pastelColors.auth.mutedText} multiline />
+          <Text style={styles.label}>Visibility</Text>
+          <View style={styles.chips}>
+            {(['public', 'members'] as const).map(value => (
+              <Pressable key={value} onPress={() => setContentVisibility(value)} style={[styles.chip, contentVisibility === value && styles.chipActive]}>
+                <Text style={[styles.chipText, contentVisibility === value && styles.chipTextActive]}>{value === 'public' ? 'Public feed' : 'Members only'}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.label}>Join policy</Text>
+          <View style={styles.chips}>
+            {(['open', 'approval', 'invite-only'] as const).map(value => (
+              <Pressable key={value} onPress={() => setJoinMode(value)} style={[styles.chip, joinMode === value && styles.chipActive]}>
+                <Text style={[styles.chipText, joinMode === value && styles.chipTextActive]}>{value === 'open' ? 'Open' : value === 'approval' ? 'Approval' : 'Invite only'}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.settingRow}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowTitle}>Show anonymous leadership labels</Text>
+              <Text style={styles.rowCopy}>Members can see moderator/owner labels, not real profiles.</Text>
+            </View>
+            <Switch value={showLeadership} onValueChange={setShowLeadership} trackColor={{true: pastelColors.accent}} />
+          </View>
+        </View>
+        <Pressable onPress={saveSettings} disabled={savingSettings} style={[styles.saveButton, savingSettings && styles.disabled]}>
+          <Text style={styles.saveButtonText}>{savingSettings ? 'Saving...' : 'Save community settings'}</Text>
+        </Pressable>
+
         <Text style={styles.section}>Auto-publish top posts</Text>
         <Text style={styles.lead}>
           Choose when the highest-voted queue post goes live. Times use {timezone}.
@@ -375,6 +561,59 @@ export default function CommunityManageScreen() {
           </View>
         )}
 
+        <Text style={styles.section}>Members and roles</Text>
+        <Text style={styles.lead}>Manage roles through anonymous member ids. Real profiles stay hidden here.</Text>
+        {members.map(member => (
+          <View style={styles.card} key={member.userId}>
+            <Text style={styles.alias}>{member.role}</Text>
+            <Text style={styles.copy}>Member {member.userId.slice(0, 8)}</Text>
+            {member.joinedAt ? <Text style={styles.meta}>Joined {new Date(member.joinedAt).toLocaleString()}</Text> : null}
+            {member.role !== 'owner' ? (
+              <View style={styles.row}>
+                <Pressable onPress={() => updateRole(member, member.role === 'moderator' ? 'member' : 'moderator')} style={styles.secondary}>
+                  <Text style={styles.secondaryText}>{member.role === 'moderator' ? 'Remove mod' : 'Make mod'}</Text>
+                </Pressable>
+                <Pressable onPress={() => requestTransfer(member)} style={styles.primary}>
+                  <Text style={styles.primaryText}>Transfer owner</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ))}
+
+        <Text style={styles.section}>
+          {reports.length ? `${reports.length} report${reports.length === 1 ? '' : 's'} to review` : 'Reports'}
+        </Text>
+        <Text style={styles.lead}>
+          {reports.length ? 'Review reported content without seeing who reported it.' : 'No pending reports.'}
+        </Text>
+        {reports.length ? (
+          reports.map(report => (
+            <View style={styles.card} key={report.id}>
+              <Text style={styles.alias}>{report.reason}</Text>
+              <Text style={styles.copy}>{report.postAlias || 'Anonymous post'}</Text>
+              {report.postText ? <Text style={styles.note}>{report.postText}</Text> : null}
+              {report.context ? <Text style={styles.note}>{report.context}</Text> : null}
+              {report.createdAt ? (
+                <Text style={styles.meta}>Reported {new Date(report.createdAt).toLocaleString()}</Text>
+              ) : null}
+              <View style={styles.row}>
+                <Pressable onPress={() => moderateContent(report.contentId, 'restore')} style={styles.secondary}>
+                  <Text style={styles.secondaryText}>Keep</Text>
+                </Pressable>
+                <Pressable onPress={() => moderateContent(report.contentId, 'remove')} style={styles.primary}>
+                  <Text style={styles.primaryText}>Remove post</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyCard}>
+            <Feather name="shield" size={22} color={pastelColors.accent} />
+            <Text style={styles.copy}>Nothing needs review.</Text>
+          </View>
+        )}
+
         <Text style={styles.section}>Audit history</Text>
         {events.length ? (
           events.map(e => (
@@ -463,6 +702,7 @@ const styles = StyleSheet.create({
     color: pastelColors.auth.deepText,
     fontWeight: '700',
   },
+  largeInput: {minHeight: 88, textAlignVertical: 'top'},
   hint: {
     marginTop: 8,
     color: pastelColors.auth.mutedText,
@@ -510,6 +750,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: pastelColors.accent,
   },
+  fullButton: {marginTop: 12, alignItems: 'center'},
   primaryText: {color: pastelColors.white, fontWeight: '900'},
   event: {
     padding: 13,

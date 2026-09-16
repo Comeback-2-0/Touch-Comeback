@@ -47,14 +47,14 @@ export default function CommunityPostCard({
             <Video
               source={{uri}}
               style={styles.media}
-              resizeMode="cover"
-              muted
-              repeat
-              paused={false}
-              controls={false}
+              resizeMode="contain"
+              muted={false}
+              repeat={false}
+              paused
+              controls
             />
           ) : (
-            <Image source={{uri}} style={styles.media} resizeMode="cover" />
+            <Image source={{uri}} style={styles.media} resizeMode="contain" />
           )}
         </View>
       ) : null}

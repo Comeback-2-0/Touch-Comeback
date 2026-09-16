@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -52,25 +53,35 @@ export default function CommunityPostScreen() {
   const base = `/communities/${communityId}/content/${contentId}`;
 
   const [post, setPost] = useState<any>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [comment, setComment] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('harassment');
+  const [reportContext, setReportContext] = useState('');
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [sending, setSending] = useState(false);
 
   const load = useCallback(async () => {
-    const [feed, comments] = await Promise.all([
-      api.get(`/communities/${communityId}/content/feed`),
-      api.get(`${base}/comments`),
-    ]);
-    const found = (feed.data.posts || []).find((item: any) => item.id === contentId);
-    if (!found) {
-      setPost(undefined);
-      return;
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get(base);
+      setPost(response.data.post);
+    } catch (err: any) {
+      setPost(null);
+      const status = err?.response?.status;
+      setError(
+        status === 403
+          ? 'Join this community to view the post.'
+          : status === 404
+            ? 'This post is unavailable.'
+            : 'Could not load this post.',
+      );
+    } finally {
+      setLoading(false);
     }
-    setPost({
-      ...found,
-      comments: comments.data.comments || found.comments || [],
-    });
-  }, [base, communityId, contentId]);
+  }, [base]);
 
   useEffect(() => {
     load();
@@ -79,9 +90,13 @@ export default function CommunityPostScreen() {
   const comments: Comment[] = useMemo(() => post?.comments || [], [post]);
 
   const react = async (value: string) => {
-    const response = await api.post(`${base}/react`, {value});
-    if (response.data.post) setPost(response.data.post);
-    else await load();
+    try {
+      const response = await api.post(`${base}/react`, {value});
+      if (response.data.post) setPost(response.data.post);
+      else await load();
+    } catch {
+      Alert.alert('Could not react', 'Join the community or try again.');
+    }
   };
 
   const sendComment = async () => {
@@ -129,11 +144,54 @@ export default function CommunityPostScreen() {
     ]);
   };
 
+  const submitReport = async () => {
+    try {
+      const response = await api.post(`${base}/report`, {
+        reason: reportReason,
+        context: reportContext.trim(),
+      });
+      if (response.data.post) setPost(response.data.post);
+      setReportOpen(false);
+      setReportContext('');
+      Alert.alert('Report sent', 'Thanks. Moderators can review it now.');
+    } catch {
+      Alert.alert('Could not report', 'Please try again.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.iconButton}>
+            <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
+          </Pressable>
+          <Text style={styles.heading}>Anonymous post</Text>
+          <View style={styles.iconButton} />
+        </View>
+        <View style={styles.center}>
+          <ActivityIndicator color={pastelColors.accent} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!post) {
     return (
       <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.iconButton}>
+            <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
+          </Pressable>
+          <Text style={styles.heading}>Anonymous post</Text>
+          <View style={styles.iconButton} />
+        </View>
         <View style={styles.center}>
-          <ActivityIndicator color={pastelColors.accent} />
+          <Feather name="alert-circle" size={28} color={pastelColors.accent} />
+          <Text style={styles.errorTitle}>{error || 'This post is unavailable.'}</Text>
+          <Pressable onPress={load} style={styles.retry}>
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -142,12 +200,15 @@ export default function CommunityPostScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.iconButton}>
           <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
         </Pressable>
         <Text style={styles.heading}>Anonymous post</Text>
         <Pressable
-          onPress={() => Share.share({message: `Join ${community.name} on Touch`})}>
+          accessibilityRole="button"
+          accessibilityLabel="Share post"
+          style={styles.iconButton}
+          onPress={() => Share.share({message: `Touch community post: ${community.name}`})}>
           <Feather name="share-2" size={21} color={pastelColors.auth.deepText} />
         </Pressable>
       </View>
@@ -166,16 +227,10 @@ export default function CommunityPostScreen() {
               </Pressable>
             ))}
             <Pressable
-              onPress={() =>
-                Alert.alert('Report post', 'Report this content?', [
-                  {text: 'Cancel', style: 'cancel'},
-                  {
-                    text: 'Report',
-                    style: 'destructive',
-                    onPress: () => api.post(`${base}/report`).then(load),
-                  },
-                ])
-              }>
+              accessibilityRole="button"
+              accessibilityLabel="Report post"
+              onPress={() => setReportOpen(true)}
+              style={styles.iconButtonSmall}>
               <Feather name="flag" size={18} color={pastelColors.auth.mutedText} />
             </Pressable>
           </View>
@@ -273,6 +328,40 @@ export default function CommunityPostScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <Modal visible={reportOpen} transparent animationType="fade" onRequestClose={() => setReportOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.reportSheet}>
+            <Text style={styles.reportTitle}>Report post</Text>
+            <Text style={styles.reportCopy}>Tell moderators what feels unsafe.</Text>
+            {['harassment', 'hate', 'spam', 'self-harm', 'other'].map(reason => (
+              <Pressable
+                key={reason}
+                onPress={() => setReportReason(reason)}
+                style={[styles.reason, reportReason === reason && styles.reasonActive]}>
+                <Text style={[styles.reasonText, reportReason === reason && styles.reasonTextActive]}>
+                  {reason}
+                </Text>
+              </Pressable>
+            ))}
+            <TextInput
+              value={reportContext}
+              onChangeText={setReportContext}
+              placeholder="Optional context"
+              placeholderTextColor={pastelColors.auth.mutedText}
+              multiline
+              style={styles.reportInput}
+            />
+            <View style={styles.reportActions}>
+              <Pressable onPress={() => setReportOpen(false)} style={styles.cancelButton}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={submitReport} style={styles.reportButton}>
+                <Text style={styles.reportButtonText}>Send report</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -286,8 +375,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heading: {fontWeight: '900', fontSize: 17, color: pastelColors.auth.deepText},
+  iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
+  iconButtonSmall: {height: 36, width: 36, alignItems: 'center', justifyContent: 'center'},
   content: {padding: 16, paddingBottom: 32},
-  center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+  center: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24},
+  errorTitle: {
+    marginTop: 12,
+    color: pastelColors.auth.deepText,
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  retry: {
+    marginTop: 16,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: pastelColors.accent,
+  },
+  retryText: {color: pastelColors.white, fontWeight: '900'},
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 18,
+    backgroundColor: 'rgba(50, 17, 31, 0.32)',
+  },
+  reportSheet: {padding: 18, borderRadius: 18, backgroundColor: pastelColors.auth.background},
+  reportTitle: {fontSize: 20, fontWeight: '900', color: pastelColors.auth.deepText},
+  reportCopy: {marginTop: 4, marginBottom: 10, color: pastelColors.auth.mutedText, fontWeight: '700'},
+  reason: {paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, marginTop: 8, backgroundColor: pastelColors.white},
+  reasonActive: {backgroundColor: pastelColors.auth.deepText},
+  reasonText: {fontWeight: '800', color: pastelColors.auth.deepText, textTransform: 'capitalize'},
+  reasonTextActive: {color: pastelColors.white},
+  reportInput: {
+    marginTop: 12,
+    minHeight: 80,
+    padding: 12,
+    borderRadius: 14,
+    textAlignVertical: 'top',
+    backgroundColor: pastelColors.white,
+    color: pastelColors.auth.deepText,
+  },
+  reportActions: {marginTop: 14, flexDirection: 'row', justifyContent: 'flex-end', gap: 10},
+  cancelButton: {paddingVertical: 10, paddingHorizontal: 14},
+  cancelText: {fontWeight: '900', color: pastelColors.auth.mutedText},
+  reportButton: {paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: pastelColors.accent},
+  reportButtonText: {fontWeight: '900', color: pastelColors.white},
   card: {
     borderRadius: 18,
     overflow: 'hidden',

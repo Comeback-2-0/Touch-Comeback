@@ -61,40 +61,6 @@ api.interceptors.response.use(
   },
 );
 
-// ------------------- GROUP APIs -------------------
-export const fetchJoinedGroups = () =>
-  api.get('/groups/joined/me');
-
-export const fetchTrendingGroups = () =>
-  api.get('/groups/trending');
-
-export const searchGroups = (query: string) =>
-  api.get(`/groups/search?query=${query}`);
-
-export const joinGroup = (groupId: string) =>
-  api.post(`/groups/${groupId}/join`);
-
-// ------------------- QUEUE APIs -------------------
-export const fetchQueuePosts = (groupId: string) =>
-  api.get(`/queue/${groupId}`);
-
-export const createQueuePost = (groupId: string, content: string) =>
-  api.post(`/queue/${groupId}`, { content });
-
-export const voteQueuePost = (postId: string) =>
-  api.post(`/queue/${postId}/vote`);
-
-export const reportQueuePost = (postId: string) =>
-  api.post(`/queue/${postId}/report`);
-
-export const undoReportQueuePost = (postId: string) =>
-  api.post(`/queue/${postId}/unreport`);
-
-
-// ------------------- POSTS APIs -------------------
-export const fetchGroupPosts = (groupId: string) =>
-  api.get(`/posts/${groupId}/posts`);
-
 export const likePost = (postId: string) =>
   api.post(`/posts/${postId}/like`);
 

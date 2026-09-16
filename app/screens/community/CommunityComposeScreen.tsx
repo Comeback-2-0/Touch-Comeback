@@ -25,6 +25,9 @@ type Route = RouteProp<CommunityStackParamList, 'CommunityCompose'>;
 type Navigation = NativeStackNavigationProp<CommunityStackParamList>;
 
 const PREVIEW = Math.min(Dimensions.get('window').width - 32, 420);
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+const MAX_VIDEO_SECONDS = 30;
 
 export default function CommunityComposeScreen() {
   const navigation = useNavigation<Navigation>();
@@ -43,7 +46,21 @@ export default function CommunityComposeScreen() {
       videoQuality: 'medium',
     });
     const asset = result.assets?.[0];
-    if (asset) setMedia(asset);
+    if (!asset) return;
+    const isPickedVideo = Boolean(asset.type?.startsWith('video') || asset.duration);
+    if (isPickedVideo && Number(asset.duration || 0) > MAX_VIDEO_SECONDS) {
+      Alert.alert('Clip is too long', 'Videos and clips must be 30 seconds or shorter.');
+      return;
+    }
+    if (isPickedVideo && Number(asset.fileSize || 0) > MAX_VIDEO_BYTES) {
+      Alert.alert('Clip is too large', 'Videos and clips must be 25 MB or smaller.');
+      return;
+    }
+    if (!isPickedVideo && Number(asset.fileSize || 0) > MAX_IMAGE_BYTES) {
+      Alert.alert('Image is too large', 'Images, memes, and stickers must be 5 MB or smaller.');
+      return;
+    }
+    setMedia(asset);
   };
 
   const submit = async () => {
@@ -112,13 +129,12 @@ export default function CommunityComposeScreen() {
               <Video
                 source={{uri: media.uri}}
                 style={styles.previewMedia}
-                resizeMode="cover"
-                muted
-                repeat
-                controls={false}
+                resizeMode="contain"
+                paused
+                controls
               />
             ) : (
-              <Image source={{uri: media.uri}} style={styles.previewMedia} resizeMode="cover" />
+              <Image source={{uri: media.uri}} style={styles.previewMedia} resizeMode="contain" />
             )}
             <Pressable onPress={() => setMedia(null)} style={styles.removeChip}>
               <Feather name="x" size={16} color={pastelColors.white} />
@@ -133,7 +149,7 @@ export default function CommunityComposeScreen() {
             accessibilityLabel="Add one image, sticker, meme, or video">
             <Feather name="image" size={28} color={pastelColors.accent} />
             <Text style={styles.addText}>Add meme / image / clip</Text>
-            <Text style={styles.addHint}>Square preview, Instagram-style</Text>
+            <Text style={styles.addHint}>1 item · Images 5 MB · Clips 30s / 25 MB</Text>
           </Pressable>
         )}
 

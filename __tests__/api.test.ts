@@ -17,10 +17,10 @@ describe('API_URL', () => {
   };
 
   it('uses the testing API in debug builds', () => {
-    expect(loadApiUrl(true)).toBe('https://api.comeback.website');
+    expect(loadApiUrl(true)).toBe('https://ij-backend.dophera.tech');
   });
 
   it('uses the load balancer API in release builds', () => {
-    expect(loadApiUrl(false)).toBe('https://touch-load-balancer.ij-roy.workers.dev');
+    expect(loadApiUrl(false)).toBe('https://ij-backend.dophera.tech');
   });
 });
