@@ -1,0 +1,39 @@
+The message received from the daemon indicates that the daemon has disappeared.
+Build request sent: Build{id=992b9717-4170-46ce-b12b-a1c08520598e, currentDir=D:\Projects\touch\touch-mobile\android}
+Attempting to read last messages from the daemon log...
+Daemon pid: 63744
+  log file: D:\AndroidStudioProjects\.gradle\daemon\8.13\daemon-63744.out.log
+----- Last 20 lines from daemon log file - daemon-63744.out.log -----
+2026-09-15T18:25:45.584+0530 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 37: received class org.gradle.launcher.daemon.protocol.Build
+2026-09-15T18:25:45.584+0530 [DEBUG] [org.gradle.launcher.daemon.server.DefaultDaemonConnection] thread 37: Received non-IO message from client: Build{id=992b9717-4170-46ce-b12b-a1c08520598e, currentDir=D:\Projects\touch\touch-mobile\android}
+2026-09-15T18:25:45.585+0530 [INFO] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Received command: Build{id=992b9717-4170-46ce-b12b-a1c08520598e, currentDir=D:\Projects\touch\touch-mobile\android}.
+2026-09-15T18:25:45.585+0530 [DEBUG] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Starting executing command: Build{id=992b9717-4170-46ce-b12b-a1c08520598e, currentDir=D:\Projects\touch\touch-mobile\android} with connection: socket connection from /127.0.0.1:57173 to /127.0.0.1:57174.
+2026-09-15T18:25:45.589+0530 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Command execution: started DaemonCommandExecution[command = Build{id=992b9717-4170-46ce-b12b-a1c08520598e, currentDir=D:\Projects\touch\touch-mobile\android}, connection = DefaultDaemonConnection: socket connection from /127.0.0.1:57173 to /127.0.0.1:57174] after 0.004416666666666667 minutes of idle
+2026-09-15T18:25:45.590+0530 [INFO] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Marking the daemon as busy, address: [7892c1e0-304d-4a6f-a38a-7ca10154f0ed port:57173, addresses:[localhost/127.0.0.1]]
+2026-09-15T18:25:45.590+0530 [DEBUG] [org.gradle.launcher.daemon.registry.PersistentDaemonRegistry] Marking busy by address: [7892c1e0-304d-4a6f-a38a-7ca10154f0ed port:57173, addresses:[localhost/127.0.0.1]]
+2026-09-15T18:25:45.591+0530 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Waiting to acquire exclusive lock on daemon addresses registry.
+2026-09-15T18:25:45.592+0530 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Lock acquired on daemon addresses registry.
+2026-09-15T18:25:45.594+0530 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on daemon addresses registry.
+2026-09-15T18:25:45.594+0530 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] resetting idle timer
+2026-09-15T18:25:45.594+0530 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] daemon is running. Sleeping until state changes.
+2026-09-15T18:25:45.598+0530 [INFO] [org.gradle.launcher.daemon.server.exec.StartBuildOrRespondWithBusy] Daemon is about to start building Build{id=992b9717-4170-46ce-b12b-a1c08520598e, currentDir=D:\Projects\touch\touch-mobile\android}. Dispatching build started information...
+2026-09-15T18:25:45.599+0530 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 39: dispatching org.gradle.launcher.daemon.protocol.BuildStarted@a828a28
+2026-09-15T18:25:45.605+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.EstablishBuildEnvironment] Configuring env variables: [USERDOMAIN_ROAMINGPROFILE, PROCESSOR_LEVEL, _CONDA_EXE, GIT_PAGER, ALLUSERSPROFILE, CODEX_MCP_NODE_PATH, CODEX_SHELL, PROCESSOR_ARCHITECTURE, ANDROID_HOME, PSModulePath, SystemDrive, =ExitCode, GH_PAGER, ACSvcPort, CODEX_APP_TOOLS_PIPE_PATH, COLORTERM, DIRNAME, USERNAME, Flutter, CUDA_PATH_V12_5, ProgramFiles(x86), ACSetupSvcPort, CODEX_INTERNAL_ORIGINATOR_OVERRIDE, APP_HOME, CODEX_SAGE_BACKFILL_TRACKER_TAB_REUSE, CUDA_PATH_V10_0, DEFAULT_JVM_OPTS, PATHEXT, SHELL, DriverData, _CONDA_ROOT, PAGER, NPM_CONFIG_PREFIX, GOPATH, CODEX_PERMISSION_PROFILE, LOG_FORMAT, ProgramData, ProgramW6432, HOMEPATH, LC_ALL, PROCESSOR_IDENTIFIER, ProgramFiles, PUBLIC, ZSH_TMUX_AUTOSTARTED, windir, LC_CTYPE, CODEX_SESSION_ID, ZES_ENABLE_SYSMAN, CONDA_BAT, IGCCSVC_DB, LOCALAPPDATA, ChocolateyLastPathUpdate, USERDOMAIN, CONDA_EXE, LOGONSERVER, JAVA_HOME, PROMPT, RUST_LOG, NVCUDASAMPLES10_0_ROOT, TERM, LANG, RlsSvcPort, OneDrive, APPDATA, GRADLE_USER_HOME, JAVA_EXE, ChocolateyInstall, CODEX_THREAD_ID, NO_COLOR, CONDA_SHLVL, NVTOOLSEXT_PATH, CODEX_CI, CommonProgramFiles, Path, DISABLE_AUTO_UPDATE, OS, COMPUTERNAME, NVCUDASAMPLES_ROOT, CUDA_PATH, EnableLog, PROCESSOR_REVISION, CLASSPATH, CLAUDE_CODE_USE_POWERSHELL_TOOL, CommonProgramW6432, ComSpec, APP_BASE_NAME, ZSH_TMUX_AUTOSTART, =D:, SystemRoot, TEMP, HOMEDRIVE, USERPROFILE, TMP, CommonProgramFiles(x86), CODEX_VERSION, NUMBER_OF_PROCESSORS]
+2026-09-15T18:25:45.613+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.LogToClient] About to start relaying all logs to the client via the connection.
+2026-09-15T18:25:45.613+0530 [INFO] [org.gradle.launcher.daemon.server.exec.LogToClient] The client will now receive all logging from the daemon (pid: 63744). The daemon log file: D:\AndroidStudioProjects\.gradle\daemon\8.13\daemon-63744.out.log
+2026-09-15T18:25:45.616+0530 [INFO] [org.gradle.launcher.daemon.server.exec.LogAndCheckHealth] Starting build in new daemon [memory: 4 GiB]
+2026-09-15T18:25:45.620+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.ExecuteBuild] The daemon has started executing the build.
+2026-09-15T18:25:45.620+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.ExecuteBuild] Executing build with daemon context: DefaultDaemonContext[uid=e9f0c36c-31fe-4985-863e-cd175ad27dc3,javaHome=C:\Program Files\Java\jdk-21,javaVersion=21,javaVendor=Oracle Corporation,daemonRegistryDir=D:\AndroidStudioProjects\.gradle\daemon,pid=63744,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-XX:MaxMetaspaceSize=1024m,-Xmx4096m,-Dfile.encoding=UTF-8,-Duser.country=IN,-Duser.language=en,-Duser.variant]----- End of the daemon log -----
+
+JVM crash log found: file:///D:/Projects/touch/touch-mobile/android/hs_err_pid63744.log
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Gradle build daemon disappeared unexpectedly (it may have been killed or may have crashed)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.

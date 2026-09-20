@@ -1214,15 +1214,3 @@ const styles = StyleSheet.create({
     backgroundColor: pastelColors.auth.glassSurface,
   },
 });
-
-});
-
-});
-
-});
-
-});
-
-});
-
-});
