@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,8 +18,16 @@ import Video from 'react-native-video';
 import {RouteProp, useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {api} from '../../utils/api';
+import {adjustPhoto, isMediaPickerCancelled} from '../../utils/mediaCrop';
 import {pastelColors} from '../../theme/colors';
 import type {CommunityStackParamList} from '../../navigation/CommunityStack';
+import {
+  COMPOSER_PROMPTS,
+  MAX_ALIAS_LENGTH,
+  MIN_ALIAS_LENGTH,
+  showCommunityToast,
+} from './communityUx';
+import {useKeyboardAwareScroll} from './communityKeyboard';
 
 type Route = RouteProp<CommunityStackParamList, 'CommunityCompose'>;
 type Navigation = NativeStackNavigationProp<CommunityStackParamList>;
@@ -29,15 +37,47 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 30;
 
+function suggestAlias() {
+  return `anon-${Math.random().toString(16).slice(2, 8)}`;
+}
+
 export default function CommunityComposeScreen() {
   const navigation = useNavigation<Navigation>();
   const {
     params: {community},
   } = useRoute<Route>();
+  const [alias, setAlias] = useState(suggestAlias);
   const [text, setText] = useState('');
-  const [link, setLink] = useState('');
   const [media, setMedia] = useState<any>(null);
   const [sending, setSending] = useState(false);
+  const [promptIndex, setPromptIndex] = useState(0);
+  const {
+    scrollRef,
+    onInputFocus,
+    contentPadding,
+    KeyboardAvoidingView,
+    keyboardAvoidingProps,
+    scrollProps,
+  } = useKeyboardAwareScroll();
+
+  useEffect(() => {
+    setPromptIndex(Math.floor(Math.random() * COMPOSER_PROMPTS.length));
+    const timer = setInterval(() => {
+      setPromptIndex(current => (current + 1) % COMPOSER_PROMPTS.length);
+    }, 7000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const placeholder = useMemo(() => COMPOSER_PROMPTS[promptIndex], [promptIndex]);
+  const trimmedAlias = alias.trim();
+  const aliasError =
+    trimmedAlias.length > 0 && trimmedAlias.length < MIN_ALIAS_LENGTH
+      ? `Name needs at least ${MIN_ALIAS_LENGTH} characters`
+      : trimmedAlias.length > MAX_ALIAS_LENGTH
+        ? `Name can be ${MAX_ALIAS_LENGTH} characters or fewer`
+        : '';
+  const canSubmit = Boolean((text.trim() || media) && trimmedAlias && !aliasError);
+  const isVideo = Boolean(media?.type?.startsWith('video') || media?.duration);
 
   const pickMedia = async () => {
     const result = await launchImageLibrary({
@@ -63,13 +103,33 @@ export default function CommunityComposeScreen() {
     setMedia(asset);
   };
 
+  const adjustMedia = async () => {
+    if (!media?.uri) return;
+    const mediaIsVideo = Boolean(media?.type?.startsWith('video') || media?.duration);
+    if (mediaIsVideo) return;
+    try {
+      const adjusted = await adjustPhoto({uri: media.uri}, 'communityCompose');
+      setMedia({
+        ...media,
+        uri: adjusted.uri,
+        type: adjusted.type,
+        fileName: adjusted.fileName,
+        fileSize: undefined,
+      });
+    } catch (error) {
+      if (!isMediaPickerCancelled(error)) {
+        Alert.alert('Could not adjust', 'Please try again.');
+      }
+    }
+  };
+
   const submit = async () => {
-    if (!text.trim() && !media) return;
+    if (!canSubmit || sending) return;
     setSending(true);
     try {
       const form = new FormData();
       form.append('text', text);
-      form.append('link', link);
+      form.append('alias', trimmedAlias);
       if (media) {
         form.append('media', {
           uri: media.uri,
@@ -80,16 +140,17 @@ export default function CommunityComposeScreen() {
       await api.post(`/communities/${community.id || community._id}/content/queue`, form, {
         headers: {'Content-Type': 'multipart/form-data'},
       });
-      Alert.alert('Sent to review', 'Your post is now in the community review queue.');
+      showCommunityToast('Sent to the review queue');
       navigation.goBack();
-    } catch {
-      Alert.alert('Could not submit', 'Please try again.');
+    } catch (err: any) {
+      Alert.alert(
+        'Could not submit',
+        err?.response?.data?.error || 'Please try again.',
+      );
     } finally {
       setSending(false);
     }
   };
-
-  const isVideo = Boolean(media?.type?.startsWith('video') || media?.duration);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -97,82 +158,121 @@ export default function CommunityComposeScreen() {
         <Pressable
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Close composer">
+          accessibilityLabel="Close composer"
+          style={styles.iconButton}>
           <Feather name="x" size={24} color={pastelColors.auth.deepText} />
         </Pressable>
-        <Text style={styles.title}>Anonymous post</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {community.name || 'Community'}
+        </Text>
         <Pressable
           onPress={submit}
-          disabled={sending || (!text.trim() && !media)}
-          accessibilityRole="button">
-          <Text
-            style={[
-              styles.submit,
-              (sending || (!text.trim() && !media)) && styles.disabled,
-            ]}>
-            Send
+          disabled={sending || !canSubmit}
+          accessibilityRole="button"
+          accessibilityLabel="Send to queue"
+          style={styles.submitButton}>
+          <Text style={[styles.submit, (sending || !canSubmit) && styles.disabled]}>
+            {sending ? '...' : 'Post'}
           </Text>
         </Pressable>
       </View>
 
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
-        <Text style={styles.note}>
-          Posts first go to {community.name}'s review queue.
-        </Text>
-
-        {media ? (
-          <View style={[styles.previewTile, {width: PREVIEW, height: PREVIEW}]}>
-            {isVideo ? (
-              <Video
-                source={{uri: media.uri}}
-                style={styles.previewMedia}
-                resizeMode="contain"
-                paused
-                controls
-              />
-            ) : (
-              <Image source={{uri: media.uri}} style={styles.previewMedia} resizeMode="contain" />
-            )}
-            <Pressable onPress={() => setMedia(null)} style={styles.removeChip}>
-              <Feather name="x" size={16} color={pastelColors.white} />
-              <Text style={styles.removeLabel}>Remove</Text>
-            </Pressable>
+      <KeyboardAvoidingView {...keyboardAvoidingProps}>
+        <ScrollView
+          ref={scrollRef}
+          {...scrollProps}
+          contentContainerStyle={[styles.content, contentPadding]}>
+          <View style={styles.note}>
+            <Text style={styles.noteTitle}>Posted under an alias</Text>
+            <Text style={styles.noteCopy}>
+              Your public profile stays hidden. Pick a name for this post, then send it to the
+              review queue.
+            </Text>
           </View>
-        ) : (
+
+          <Text style={styles.label}>Posting as</Text>
+          <TextInput
+            accessibilityLabel="Editable alias"
+            value={alias}
+            onChangeText={setAlias}
+            onFocus={onInputFocus}
+            maxLength={MAX_ALIAS_LENGTH}
+            placeholder="Choose a name"
+            placeholderTextColor={pastelColors.auth.mutedText}
+            style={styles.aliasInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {aliasError ? <Text style={styles.aliasError}>{aliasError}</Text> : null}
+
+          {media ? (
+            <View style={[styles.previewTile, {width: PREVIEW, height: PREVIEW}]}>
+              {isVideo ? (
+                <Video
+                  source={{uri: media.uri}}
+                  style={styles.previewMedia}
+                  resizeMode="contain"
+                  paused
+                  controls
+                />
+              ) : (
+                <Image source={{uri: media.uri}} style={styles.previewMedia} resizeMode="contain" />
+              )}
+              {!isVideo ? (
+                <Pressable
+                  onPress={adjustMedia}
+                  accessibilityRole="button"
+                  accessibilityLabel="Adjust image"
+                  style={styles.adjustChip}>
+                  <Feather name="crop" size={16} color={pastelColors.white} />
+                  <Text style={styles.removeLabel}>Adjust</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => setMedia(null)} style={styles.removeChip}>
+                <Feather name="x" size={16} color={pastelColors.white} />
+                <Text style={styles.removeLabel}>Remove</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={pickMedia}
+              style={styles.add}
+              accessibilityRole="button"
+              accessibilityLabel="Add one image, sticker, meme, or video">
+              <Feather name="image" size={28} color={pastelColors.accent} />
+              <View style={styles.addTextWrap}>
+                <Text style={styles.addText}>Add meme, image, sticker, or clip</Text>
+                <Text style={styles.addHint}>Optional | 1 item | Images 5 MB | Clips 30s / 25 MB</Text>
+              </View>
+            </Pressable>
+          )}
+
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            onFocus={onInputFocus}
+            multiline
+            placeholder={placeholder}
+            placeholderTextColor={pastelColors.auth.mutedText}
+            style={[styles.text, !media && styles.textOnly]}
+          />
+
+          {sending ? <ActivityIndicator style={styles.loading} color={pastelColors.accent} /> : null}
+
           <Pressable
-            onPress={pickMedia}
-            style={[styles.add, {width: PREVIEW, height: PREVIEW}]}
             accessibilityRole="button"
-            accessibilityLabel="Add one image, sticker, meme, or video">
-            <Feather name="image" size={28} color={pastelColors.accent} />
-            <Text style={styles.addText}>Add meme / image / clip</Text>
-            <Text style={styles.addHint}>1 item · Images 5 MB · Clips 30s / 25 MB</Text>
+            accessibilityLabel="Send to queue"
+            onPress={submit}
+            disabled={sending || !canSubmit}
+            style={[styles.bottomCta, (sending || !canSubmit) && styles.bottomCtaDisabled]}>
+            {sending ? (
+              <ActivityIndicator color={pastelColors.white} />
+            ) : (
+              <Text style={styles.bottomCtaText}>Send to queue</Text>
+            )}
           </Pressable>
-        )}
-
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          multiline
-          placeholder={media ? 'Write a caption...' : 'Say what you cannot say elsewhere...'}
-          placeholderTextColor={pastelColors.auth.mutedText}
-          style={[styles.text, !media && styles.textOnly]}
-        />
-
-        <TextInput
-          value={link}
-          onChangeText={setLink}
-          placeholder="Optional link"
-          placeholderTextColor={pastelColors.auth.mutedText}
-          autoCapitalize="none"
-          style={styles.link}
-        />
-
-        {sending ? <ActivityIndicator style={styles.loading} color={pastelColors.accent} /> : null}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -186,21 +286,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  title: {fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
-  submit: {fontWeight: '900', color: pastelColors.accent},
+  iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
+  submitButton: {minWidth: 56, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center'},
+  title: {
+    flex: 1,
+    marginHorizontal: 8,
+    fontSize: 18,
+    fontWeight: '900',
+    color: pastelColors.auth.deepText,
+    textAlign: 'center',
+  },
+  submit: {fontWeight: '900', color: pastelColors.accent, fontSize: 16},
   disabled: {opacity: 0.4},
   content: {paddingHorizontal: 16, paddingBottom: 32},
   note: {
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: pastelColors.auth.glassSurface,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: pastelColors.auth.primaryOverlay,
+    marginBottom: 14,
+  },
+  noteTitle: {fontWeight: '900', color: pastelColors.auth.deepText},
+  noteCopy: {
+    marginTop: 4,
     color: pastelColors.auth.mutedText,
     fontWeight: '700',
-    marginBottom: 16,
+    lineHeight: 18,
   },
+  label: {
+    marginBottom: 8,
+    fontWeight: '900',
+    color: pastelColors.auth.deepText,
+  },
+  aliasInput: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: pastelColors.white,
+    color: pastelColors.accent,
+    fontWeight: '900',
+    fontSize: 16,
+  },
+  aliasError: {marginTop: 6, color: pastelColors.error, fontWeight: '800', fontSize: 12},
   previewTile: {
+    marginTop: 14,
     alignSelf: 'center',
-    borderRadius: 18,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: pastelColors.auth.primaryOverlay,
   },
@@ -217,37 +348,55 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(50,17,31,0.72)',
   },
+  adjustChip: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(50,17,31,0.72)',
+  },
   removeLabel: {color: pastelColors.white, fontWeight: '800', fontSize: 12},
   add: {
-    alignSelf: 'center',
+    marginTop: 14,
+    minHeight: 72,
+    padding: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: pastelColors.accent,
-    borderRadius: 18,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    flexDirection: 'row',
+    gap: 12,
     backgroundColor: pastelColors.auth.glassSurface,
   },
+  addTextWrap: {flex: 1},
   addText: {fontWeight: '800', color: pastelColors.accent},
   addHint: {color: pastelColors.auth.mutedText, fontWeight: '600', fontSize: 12},
   text: {
-    marginTop: 16,
+    marginTop: 12,
     minHeight: 88,
     padding: 14,
-    borderRadius: 16,
+    borderRadius: 12,
     backgroundColor: pastelColors.white,
     color: pastelColors.auth.deepText,
     fontSize: 17,
     textAlignVertical: 'top',
   },
   textOnly: {minHeight: 160, fontSize: 18, lineHeight: 26, fontWeight: '600'},
-  link: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: pastelColors.white,
-    color: pastelColors.auth.deepText,
-  },
   loading: {marginTop: 16},
+  bottomCta: {
+    marginTop: 22,
+    minHeight: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.accent,
+  },
+  bottomCtaDisabled: {opacity: 0.55},
+  bottomCtaText: {color: pastelColors.white, fontWeight: '900', fontSize: 16},
 });

@@ -13,6 +13,7 @@ import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-pick
 import { uploadReel } from '../utils/api';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
+import {useKeyboardAwareScroll} from './community/communityKeyboard';
 
 const PostReelScreen = () => {
   const [videoAsset, setVideoAsset] = useState<Asset | null>(null);
@@ -20,6 +21,14 @@ const PostReelScreen = () => {
   const [mood, setMood] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [uploading, setUploading] = useState(false);
+  const {
+    scrollRef,
+    onInputFocus,
+    contentPadding,
+    KeyboardAvoidingView,
+    keyboardAvoidingProps,
+    scrollProps,
+  } = useKeyboardAwareScroll();
 
 
   const formatHashtags = (text: string) =>
@@ -79,7 +88,11 @@ const PostReelScreen = () => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView {...keyboardAvoidingProps}>
+    <ScrollView
+      ref={scrollRef}
+      {...scrollProps}
+      contentContainerStyle={[styles.container, contentPadding]}>
       <Text style={styles.heading}>🎬 Post a Reel</Text>
 
       {!videoAsset ? (
@@ -106,6 +119,7 @@ const PostReelScreen = () => {
             style={styles.input}
             value={caption}
             onChangeText={setCaption}
+            onFocus={onInputFocus}
             placeholder="Write a caption..."
             placeholderTextColor="#888"
           />
@@ -113,6 +127,7 @@ const PostReelScreen = () => {
             style={styles.input}
             value={mood}
             onChangeText={setMood}
+            onFocus={onInputFocus}
             placeholder="Enter mood (e.g., Funny)"
             placeholderTextColor="#888"
           />
@@ -120,6 +135,7 @@ const PostReelScreen = () => {
             style={styles.input}
             value={hashtags}
             onChangeText={setHashtags}
+            onFocus={onInputFocus}
             placeholder="Enter hashtags (e.g., travel, fun, party)"
             placeholderTextColor="#888"
           />
@@ -137,6 +153,7 @@ const PostReelScreen = () => {
         </>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

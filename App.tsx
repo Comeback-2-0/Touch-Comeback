@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppSystemBars from './app/components/AppSystemBars';
 import { AuthProvider } from './app/context/AuthContext';
 import RootNavigator from './app/navigation/RootNavigator';
+import { communityLinking } from './app/navigation/communityLinking';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +31,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <AppSystemBars />
-          <NavigationContainer>
+          <NavigationContainer linking={communityLinking}>
             <RootNavigator />
           </NavigationContainer>
         </AuthProvider>

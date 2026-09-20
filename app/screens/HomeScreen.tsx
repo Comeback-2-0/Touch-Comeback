@@ -17,6 +17,7 @@ import type {AppStackParamList} from '../navigation/AppStack';
 import PublicPostCard from '../features/posts/components/PublicPostCard';
 import {useHomeFeed} from '../features/posts/hooks/useHomeFeed';
 import {pickPostImages} from '../features/posts/utils/postImagePicker';
+import {isMediaPickerCancelled} from '../utils/mediaCrop';
 import TouchLogo from '../../assets/logos/touch-logo.svg';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -27,9 +28,15 @@ export default function HomeScreen() {
   const posts = useMemo(() => feedQuery.data?.posts || [], [feedQuery.data?.posts]);
 
   const openCreatePost = async () => {
-    const images = await pickPostImages();
-    if (!images.length) return;
-    navigation.navigate('CreatePost', {images});
+    try {
+      const images = await pickPostImages();
+      if (!images.length) return;
+      navigation.navigate('CreatePost', {images});
+    } catch (error) {
+      if (!isMediaPickerCancelled(error)) {
+        // Picker failures are non-fatal; user can tap again.
+      }
+    }
   };
 
   return (

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,9 +13,10 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import ImagePicker from 'react-native-image-crop-picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Feather from 'react-native-vector-icons/Feather';
 import {submitBugReport} from '../utils/api';
+import {adjustPhoto, isMediaPickerCancelled, pickPhoto} from '../utils/mediaCrop';
 import {pastelColors} from '../theme/colors';
 
 type Screenshot = {
@@ -37,16 +37,34 @@ export default function ReportBugScreen() {
 
   const pickScreenshot = async () => {
     try {
-      const image = await ImagePicker.openPicker({mediaType: 'photo'});
+      const image = await pickPhoto('bugReport');
+      if (!image) return;
       setScreenshot({
-        uri: image.path,
-        fileName: image.filename || 'bug-screenshot.jpg',
-        type: image.mime || 'image/jpeg',
+        uri: image.uri,
+        fileName: image.fileName,
+        type: image.type,
       });
       setError('');
     } catch (err: any) {
-      if (err?.code !== 'E_PICKER_CANCELLED') {
+      if (!isMediaPickerCancelled(err)) {
         setError('Could not attach screenshot');
+      }
+    }
+  };
+
+  const adjustScreenshot = async () => {
+    if (!screenshot?.uri) return;
+    try {
+      const adjusted = await adjustPhoto(screenshot, 'bugReport');
+      setScreenshot({
+        uri: adjusted.uri,
+        fileName: adjusted.fileName,
+        type: adjusted.type,
+      });
+      setError('');
+    } catch (err: any) {
+      if (!isMediaPickerCancelled(err)) {
+        setError('Could not adjust screenshot');
       }
     }
   };
@@ -86,9 +104,12 @@ export default function ReportBugScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         style={styles.keyboardView}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={styles.content}>
           <Text style={styles.label}>What happened?</Text>
           <TextInput
             testID="bug-what-happened"
@@ -124,7 +145,18 @@ export default function ReportBugScreen() {
           </Pressable>
 
           {screenshot ? (
-            <Image source={{uri: screenshot.uri}} style={styles.screenshotPreview} />
+            <View style={styles.screenshotPreviewWrap}>
+              <Image source={{uri: screenshot.uri}} style={styles.screenshotPreview} />
+              <Pressable
+                testID="bug-screenshot-adjust"
+                accessibilityRole="button"
+                accessibilityLabel="Adjust screenshot"
+                onPress={adjustScreenshot}
+                style={styles.adjustChip}>
+                <Feather name="crop" size={16} color={pastelColors.white} />
+                <Text style={styles.adjustLabel}>Adjust</Text>
+              </Pressable>
+            </View>
           ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -226,9 +258,30 @@ const styles = StyleSheet.create({
   screenshotPreview: {
     width: 104,
     height: 104,
-    marginTop: 12,
     borderRadius: 16,
     backgroundColor: pastelColors.card,
+  },
+  screenshotPreviewWrap: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    position: 'relative',
+  },
+  adjustChip: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(50,17,31,0.72)',
+  },
+  adjustLabel: {
+    color: pastelColors.white,
+    fontWeight: '800',
+    fontSize: 12,
   },
   error: {
     marginTop: 14,

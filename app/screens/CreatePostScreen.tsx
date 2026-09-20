@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,7 @@ import {pastelColors} from '../theme/colors';
 import {useCreatePost} from '../features/posts/hooks/useCreatePost';
 import type {LocalPostImage} from '../features/posts/types';
 import {adjustPostImage} from '../features/posts/utils/postImagePicker';
+import {isMediaPickerCancelled} from '../utils/mediaCrop';
 
 const CAPTION_LIMIT = 2000;
 
@@ -61,7 +61,8 @@ export default function CreatePostScreen({navigation, route}: Props) {
       setSelectedImages(current =>
         current.map((item, itemIndex) => (itemIndex === index ? adjustedImage : item)),
       );
-    } catch (err) {
+    } catch (err: any) {
+      if (isMediaPickerCancelled(err)) return;
       setLocalError('Could not adjust that image. Try again.');
     }
   };
@@ -85,7 +86,7 @@ export default function CreatePostScreen({navigation, route}: Props) {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior="padding">
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
@@ -100,6 +101,7 @@ export default function CreatePostScreen({navigation, route}: Props) {
 
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}>
           <ScrollView

@@ -1,7 +1,9 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -9,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import {pastelColors} from '../../theme/colors';
+import {DOT, ELLIPSIS} from './communityUx';
+import {useKeyboardHeight} from './communityKeyboard';
 
 type Props = {
   visible: boolean;
@@ -25,11 +29,11 @@ type Props = {
 };
 
 function suggestAlias() {
-  const animals = ['Owl', 'Fox', 'Moth', 'Kite', 'Fern', 'Wave', 'Ember', 'Moss'];
-  const moods = ['Quiet', 'Night', 'Soft', 'Hidden', 'Kind', 'Brave', 'Calm', 'Wild'];
+  const animals = ['Owl', 'Fox', 'Moth', 'Kite', 'Fern', 'Wave', 'Ember', 'Moss', 'Lantern', 'Rain'];
+  const moods = ['Quiet', 'Night', 'Soft', 'Hidden', 'Kind', 'Brave', 'Calm', 'Wild', 'Guest', 'Blue'];
   const animal = animals[Math.floor(Math.random() * animals.length)];
   const mood = moods[Math.floor(Math.random() * moods.length)];
-  return `${mood}${animal}${Math.floor(Math.random() * 90) + 10}`;
+  return `${mood} ${animal}`;
 }
 
 export default function CommunityJoinRequestSheet({
@@ -43,6 +47,7 @@ export default function CommunityJoinRequestSheet({
   const [revealUsername, setRevealUsername] = useState(false);
   const [alias, setAlias] = useState(suggestAlias());
   const [note, setNote] = useState('');
+  const keyboardHeight = useKeyboardHeight();
   const displayUsername = username.trim().replace(/^@/, '');
 
   useEffect(() => {
@@ -60,19 +65,31 @@ export default function CommunityJoinRequestSheet({
     return useAlias || revealUsername;
   }, [alias, displayUsername, revealUsername, useAlias]);
 
+  const previewParts = [
+    useAlias ? alias.trim() || 'alias' : null,
+    revealUsername ? `@${displayUsername}` : null,
+    note.trim() ? 'your note' : null,
+  ].filter(Boolean);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView style={styles.overlay} behavior="padding">
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, {paddingBottom: 28 + keyboardHeight}]}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
+          bounces={false}>
           <Text style={styles.title}>Ask to join</Text>
           <Text style={styles.copy}>
-            Moderators see only what you choose here. The community will not see this request.
+            Your public profile is not shown in the community. Moderators only see what you
+            choose below.
           </Text>
 
           <View style={styles.row}>
             <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Use an alias</Text>
+              <Text style={styles.rowTitle}>Use only an alias</Text>
               <Text style={styles.rowCopy}>A nickname only for this request.</Text>
             </View>
             <Switch
@@ -86,7 +103,7 @@ export default function CommunityJoinRequestSheet({
               accessibilityLabel="Join request alias"
               value={alias}
               onChangeText={setAlias}
-              placeholder="Suggested alias"
+              placeholder="Quiet Fox"
               placeholderTextColor={pastelColors.auth.mutedText}
               style={styles.input}
             />
@@ -94,9 +111,9 @@ export default function CommunityJoinRequestSheet({
 
           <View style={styles.row}>
             <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Show my real username</Text>
+              <Text style={styles.rowTitle}>Reveal my app username to admins</Text>
               <Text style={styles.rowCopy}>
-                Admins see @{displayUsername || 'your_username'} — not the whole community.
+                Admins see @{displayUsername || 'your_username'} - not the whole community.
               </Text>
             </View>
             <Switch
@@ -118,12 +135,9 @@ export default function CommunityJoinRequestSheet({
           />
 
           <View style={styles.preview}>
-            <Text style={styles.previewLabel}>Moderators will see</Text>
-            <Text style={styles.previewText}>
-              {useAlias ? `Alias: ${alias.trim() || 'required'}` : 'No alias'}
-              {revealUsername ? ` · @${displayUsername}` : ''}
-              {note.trim() ? ' · Note included' : ''}
-            </Text>
+            <Text style={styles.previewLabel}>Admins will see</Text>
+            <Text style={styles.previewText}>{previewParts.join(DOT) || 'Nothing yet'}</Text>
+            <Text style={styles.warning}>Your public profile is not shown in the community.</Text>
           </View>
 
           {!canSend ? (
@@ -144,13 +158,16 @@ export default function CommunityJoinRequestSheet({
               })
             }
             style={[styles.button, (!canSend || submitting) && styles.disabled]}>
-            <Text style={styles.buttonText}>{submitting ? 'Sending…' : 'Send request'}</Text>
+            <Text style={styles.buttonText}>
+              {submitting ? `Sending${ELLIPSIS}` : 'Send request'}
+            </Text>
           </Pressable>
           <Pressable onPress={onClose} style={styles.cancel}>
             <Text style={styles.cancelText}>Not now</Text>
           </Pressable>
+        </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -159,6 +176,7 @@ const styles = StyleSheet.create({
   overlay: {flex: 1, justifyContent: 'flex-end'},
   backdrop: {...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(50, 17, 31, 0.28)'},
   sheet: {
+    maxHeight: '92%',
     paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 28,
@@ -216,6 +234,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 17,
   },
+  warning: {
+    marginTop: 8,
+    color: pastelColors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   hint: {
     marginTop: 12,
     color: pastelColors.auth.mutedText,
@@ -224,6 +248,7 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 20,
+    minHeight: 48,
     paddingVertical: 15,
     alignItems: 'center',
     borderRadius: 16,

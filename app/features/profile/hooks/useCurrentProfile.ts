@@ -16,7 +16,14 @@ export function useCurrentProfile(options: Options = {}) {
     queryKey: PROFILE_QUERY_KEY,
     queryFn: fetchCurrentProfile,
     enabled: options.enabled ?? true,
-    retry: 2,
+    retry: (failureCount, error: any) => {
+      const status = error?.response?.status;
+      // Don't hammer a dead server during bootstrap.
+      if (!error?.response || (typeof status === 'number' && status >= 500)) {
+        return false;
+      }
+      return failureCount < 1;
+    },
     staleTime: 30_000,
   });
 

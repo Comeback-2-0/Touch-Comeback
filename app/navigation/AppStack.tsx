@@ -4,8 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import { RouteProp } from '@react-navigation/native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
+import {pastelColors} from '../theme/colors';
 
 // PostQueueProvider import preserved — will be restored when Community is ready
 // import { PostQueueProvider } from '../context/PostQueueContext';
@@ -50,7 +50,7 @@ function getTabIcon(routeName: keyof MainTabParamList, color: string, size: numb
     case 'ProfileTab':
       return <Feather name="user" size={size} color={color} />;
     case 'ChatTab':
-      return <Ionicons name="chatbubbles-outline" size={size} color={color} />;
+      return <Feather name="users" size={size} color={color} />;
     case 'Reels':
       return <Feather name="smartphone" size={size} color={color} />;
     default:
@@ -67,6 +67,14 @@ function getTabIcon(routeName: keyof MainTabParamList, color: string, size: numb
 //   );
 // }
 
+const TAB_LABELS: Record<keyof MainTabParamList, string> = {
+  Home: 'Home',
+  SearchBar: 'Search',
+  ChatTab: 'Communities',
+  Reels: 'Reels',
+  ProfileTab: 'Profile',
+};
+
 function getTabScreenOptions({
   route,
 }: {
@@ -74,11 +82,14 @@ function getTabScreenOptions({
 }) {
   return {
     headerShown: false,
-    tabBarShowLabel: false,
-    tabBarActiveTintColor: '#ff00ff',
-    tabBarInactiveTintColor: '#080008',
+    tabBarShowLabel: true,
+    tabBarLabel: TAB_LABELS[route.name],
+    tabBarActiveTintColor: pastelColors.accent,
+    tabBarInactiveTintColor: pastelColors.auth.deepText,
+    tabBarHideOnKeyboard: true,
     tabBarStyle: styles.tabBar,
     tabBarItemStyle: styles.tabBarItem,
+    tabBarLabelStyle: styles.tabBarLabel,
     // The library's internal Pressable (tabVerticalUiKit) uses
     // justifyContent: 'flex-start' — it cannot be overridden via
     // tabBarItemStyle which targets the outer wrapper, not the Pressable.
@@ -137,9 +148,10 @@ const styles = StyleSheet.create({
   tabBarItem: {
     flex: 1,
   },
-  // Replaces the internal Pressable whose justifyContent is hardcoded
-  // to 'flex-start' in the library source (BottomTabItem.tsx tabVerticalUiKit).
-  // This is the correct hook point per React Navigation docs (tabBarButton prop).
+  tabBarLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
   tabBarButton: {
     flex: 1,
     justifyContent: 'center',

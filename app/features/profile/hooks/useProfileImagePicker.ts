@@ -1,6 +1,10 @@
 import {useState} from 'react';
-import ImagePicker from 'react-native-image-crop-picker';
 import type {LocalProfileImage} from '../types';
+import {
+  adjustPhoto,
+  isMediaPickerCancelled,
+  pickAvatarPhoto,
+} from '../../../utils/mediaCrop';
 
 export function useProfileImagePicker(initialUri = '') {
   const [image, setImage] = useState<LocalProfileImage | null>(
@@ -8,28 +12,28 @@ export function useProfileImagePicker(initialUri = '') {
   );
 
   const pickImage = async () => {
-    const picked = await ImagePicker.openPicker({
-      width: 512,
-      height: 512,
-      cropping: true,
-      cropperCircleOverlay: false,
-      mediaType: 'photo',
-      compressImageQuality: 0.88,
-      includeExif: false,
-    });
+    try {
+      const picked = await pickAvatarPhoto('profile');
+      if (picked) setImage(picked);
+    } catch (error) {
+      if (!isMediaPickerCancelled(error)) throw error;
+    }
+  };
 
-    const uri = picked.path;
-    const fileName = uri.split('/').pop() || 'profile-picture.jpg';
-    setImage({
-      uri,
-      fileName,
-      type: picked.mime || 'image/jpeg',
-    });
+  const adjustImage = async () => {
+    if (!image?.uri) return;
+    try {
+      const adjusted = await adjustPhoto(image, 'profile');
+      setImage(adjusted);
+    } catch (error) {
+      if (!isMediaPickerCancelled(error)) throw error;
+    }
   };
 
   return {
     image,
     pickImage,
+    adjustImage,
     clearImage: () => setImage(null),
   };
 }

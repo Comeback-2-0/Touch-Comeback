@@ -1,8 +1,10 @@
 // app/components/PostCard.tsx
 import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Image} from 'react-native';
+import {Pressable, StyleSheet, Text, View, Image} from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import {Post} from '../navigation/types/Post';
 import dayjs from 'dayjs';
+import {pastelColors} from '../theme/colors';
 
 type Props = {
   post: Post;
@@ -31,9 +33,9 @@ const PostCard: React.FC<Props> = ({
           <Text style={styles.date}>
             {dayjs(post.approvedAt).format('MMM D, YYYY')}
           </Text>
-          <TouchableOpacity onPress={onReport}>
-            <Text style={styles.menu}>⋮</Text>
-          </TouchableOpacity>
+          <Pressable onPress={onReport} accessibilityRole="button" accessibilityLabel="Post options">
+            <Feather name="more-vertical" size={18} color={pastelColors.auth.deepText} />
+          </Pressable>
         </View>
       )}
       {/* Content */}
@@ -55,32 +57,37 @@ const PostCard: React.FC<Props> = ({
       {/* Footer Row */}
       {!minimal && (
         <View style={styles.footer}>
-          <TouchableOpacity onPress={onLike}>
-            <Text style={styles.icon}>❤️ {post.likes}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onDislike}>
-            <Text style={styles.icon}>👎 {post.dislikes || 0}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onShare}>
-            <Text style={styles.icon}>↗️ SHARE</Text>
-          </TouchableOpacity>
+          <Pressable onPress={onLike} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Like post">
+            <Feather name="thumbs-up" size={18} color={pastelColors.auth.deepText} />
+            <Text style={styles.icon}>{post.likes}</Text>
+          </Pressable>
+          <Pressable onPress={onDislike} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Dislike post">
+            <Feather name="thumbs-down" size={18} color={pastelColors.auth.deepText} />
+            <Text style={styles.icon}>{post.dislikes || 0}</Text>
+          </Pressable>
+          <Pressable onPress={onShare} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Share post">
+            <Feather name="share-2" size={18} color={pastelColors.auth.deepText} />
+            <Text style={styles.icon}>Share</Text>
+          </Pressable>
         </View>
       )}
 
       {/* Comments */}
       {!minimal && (
-        <TouchableOpacity
+        <Pressable
           onPress={onOpenComments}
-          style={styles.commentsContainer}>
+          style={styles.commentsContainer}
+          accessibilityRole="button"
+          accessibilityLabel={`Comments, ${post.comments.length}`}>
           <Text style={styles.commentsTitle}>
-            💬 Comments {post.comments.length}
+            Comments {post.comments.length}
           </Text>
           {post.comments.length > 0 && (
             <Text style={styles.topComment} numberOfLines={2}>
               {post.comments[0].text}
             </Text>
           )}
-        </TouchableOpacity>
+        </Pressable>
       )}
     </View>
   );
@@ -133,6 +140,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 8,
+  },
+  iconButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   icon: {
     fontSize: 14,

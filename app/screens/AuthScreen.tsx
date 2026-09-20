@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -33,19 +33,13 @@ const AnimatedView = Animated.View as React.ComponentType<any>;
 const APP_ICON = require('../../android/app/src/main/ic_launcher-playstore.png');
 const TERMS_URL = 'https://ij-roy.github.io/touch/terms-and-conditions/';
 
-type AuthToastProps = {
-  message: string | null;
-};
-
-function showAuthError(message: AuthToastProps['message']) {
+function showAuthToast(message: string | null | undefined) {
   if (!message) return;
-
   if (Platform.OS === 'android') {
     ToastAndroid.show(message, ToastAndroid.LONG);
     return;
   }
-
-  Alert.alert('Could not sign in', message);
+  Alert.alert('Touch', message);
 }
 
 function AnimatedBackdrop() {
@@ -107,29 +101,34 @@ function GoogleIcon() {
   );
 }
 
-export default function AuthScreen() {
+type Props = {
+  route?: {
+    params?: {
+      authError?: string;
+    };
+  };
+};
+
+export default function AuthScreen({route}: Props) {
   const {signInWithGoogle} = useAuth();
   const [signingIn, setSigningIn] = useState(false);
-  const entrance = useSharedValue(0);
+  const toastedRouteError = useRef(false);
   const buttonScale = useSharedValue(1);
   const glow = useSharedValue(0);
 
   useEffect(() => {
-    entrance.value = withTiming(1, {
-      duration: 520,
-      easing: Easing.inOut(Easing.ease),
-    });
+    if (!route?.params?.authError || toastedRouteError.current) return;
+    toastedRouteError.current = true;
+    showAuthToast(route.params.authError);
+  }, [route?.params?.authError]);
+
+  useEffect(() => {
     glow.value = withRepeat(
       withTiming(1, {duration: 1800, easing: Easing.inOut(Easing.ease)}),
       -1,
       true,
     );
-  }, [entrance, glow]);
-
-  const titleStyle = useAnimatedStyle(() => ({
-    opacity: entrance.value,
-    transform: [{translateY: (1 - entrance.value) * -18}],
-  }));
+  }, [glow]);
 
   const buttonStyle = useAnimatedStyle(() => ({
     transform: [{scale: buttonScale.value}],
@@ -144,7 +143,7 @@ export default function AuthScreen() {
     try {
       await signInWithGoogle();
     } catch (err) {
-      showAuthError(getAuthErrorMessage(err));
+      showAuthToast(getAuthErrorMessage(err));
     } finally {
       setSigningIn(false);
     }
@@ -158,7 +157,7 @@ export default function AuthScreen() {
     <SafeAreaView style={styles.safeArea}>
       <AnimatedBackdrop />
       <View style={styles.container}>
-        <AnimatedView style={[styles.content, titleStyle]}>
+        <View style={styles.content}>
           <Image
             testID="auth-app-icon"
             source={APP_ICON}
@@ -208,7 +207,7 @@ export default function AuthScreen() {
               />
             ) : null}
           </AnimatedPressable>
-        </AnimatedView>
+        </View>
 
         <Text style={styles.termsText}>
           By continuing you agree to our{' '}
@@ -236,7 +235,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 72,
     paddingBottom: 28,
-    overflow: 'hidden',
   },
   backdropPanelTop: {
     position: 'absolute',
@@ -345,13 +343,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     maxWidth: 340,
     color: pastelColors.auth.mutedText,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
     textAlign: 'center',
     fontWeight: '600',
   },
   termsLink: {
-    color: pastelColors.auth.deepText,
-    fontWeight: '900',
+    color: pastelColors.accent,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
 });

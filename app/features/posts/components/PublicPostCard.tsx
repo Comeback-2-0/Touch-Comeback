@@ -4,6 +4,7 @@ import {
   Animated,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import dayjs from 'dayjs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {pastelColors} from '../../../theme/colors';
+import {useKeyboardHeight} from '../../../screens/community/communityKeyboard';
 import type {PostReportReason, PublicPost} from '../types';
 import CommentIcon from '../../../../assets/icons/comment.svg';
 import LikeIcon from '../../../../assets/icons/like.svg';
@@ -30,10 +32,12 @@ import {
   unlikePost,
   withdrawPostReport,
 } from '../api/postsApi';
+import {commentOnPost} from '../../../utils/api';
 
 type Props = {
   post: PublicPost;
   compact?: boolean;
+  onCommentPress?: () => void;
 };
 
 type PlaceholderState = {
@@ -67,12 +71,15 @@ function formatCount(value: number) {
   return String(value);
 }
 
-function PublicPostCard({post, compact = false}: Props) {
+function PublicPostCard({post, compact = false, onCommentPress}: Props) {
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [metaIndex, setMetaIndex] = useState(0);
   const [liked, setLiked] = useState(Boolean(post.viewerEngagement?.liked));
   const [likesCount, setLikesCount] = useState(post.engagement.likesCount || 0);
   const [likeMutationPending, setLikeMutationPending] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentSending, setCommentSending] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsMenuPosition, setOptionsMenuPosition] = useState<{top: number; left: number} | null>(null);
   const [placeholder, setPlaceholder] = useState<PlaceholderState | null>(null);
@@ -87,6 +94,7 @@ function PublicPostCard({post, compact = false}: Props) {
   const lastMediaTapAt = useRef(0);
   const optionsButtonRef = useRef<View | null>(null);
   const {width: screenWidth, height: screenHeight} = useWindowDimensions();
+  const keyboardHeight = useKeyboardHeight();
   const images = post.media.filter(item => item.type === 'image');
   const shouldCollapseCaption = post.text.length > 90 && !captionExpanded;
   const caption = shouldCollapseCaption ? `${post.text.slice(0, 90).trim()}...` : post.text;
@@ -421,13 +429,14 @@ function PublicPostCard({post, compact = false}: Props) {
           visible
           animationType="fade"
           onRequestClose={() => setReportModalVisible(false)}>
+          <KeyboardAvoidingView behavior="padding" style={styles.reportOverlay}>
           <Pressable
             testID="post-report-backdrop"
-            style={styles.reportOverlay}
+            style={styles.reportFlex}
             onPress={() => setReportModalVisible(false)}>
             <View
               testID="post-report-modal"
-              style={styles.reportDialog}
+              style={[styles.reportDialog, {marginBottom: keyboardHeight > 0 ? 12 : 0}]}
               onStartShouldSetResponder={() => true}>
               <Text style={styles.reportTitle}>Report post</Text>
               <Text style={styles.reportSubtitle}>Why are you reporting this?</Text>
@@ -477,6 +486,7 @@ function PublicPostCard({post, compact = false}: Props) {
               </Pressable>
             </View>
           </Pressable>
+          </KeyboardAvoidingView>
         </Modal>
       ) : null}
 
@@ -530,10 +540,19 @@ function PublicPostCard({post, compact = false}: Props) {
 
       {!compact ? (
         <View style={styles.actionRow}>
-          <View style={styles.commentAction}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Comments, ${formatCount(post.engagement.commentsCount)}`}
+            testID="post-comment-action"
+            hitSlop={8}
+            onPress={() => {
+              if (onCommentPress) onCommentPress();
+              else setCommentsOpen(true);
+            }}
+            style={styles.commentAction}>
             <CommentIcon width={24} height={22} />
             <Text style={styles.actionCount}>{formatCount(post.engagement.commentsCount)}</Text>
-          </View>
+          </Pressable>
           <View style={styles.rightActions}>
             <Pressable
               accessibilityRole="button"
@@ -584,9 +603,70 @@ function PublicPostCard({post, compact = false}: Props) {
       {compact ? (
         <View style={styles.engagementRow}>
           <Text style={styles.engagement}>Likes {likesCount}</Text>
-          <Text style={styles.engagement}>Comments {post.engagement.commentsCount}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Comments, ${post.engagement.commentsCount}`}
+            onPress={() => {
+              if (onCommentPress) onCommentPress();
+              else setCommentsOpen(true);
+            }}>
+            <Text style={styles.engagement}>Comments {post.engagement.commentsCount}</Text>
+          </Pressable>
         </View>
       ) : null}
+
+      <Modal
+        transparent
+        visible={commentsOpen}
+        animationType="slide"
+        onRequestClose={() => setCommentsOpen(false)}>
+        <KeyboardAvoidingView behavior="padding" style={styles.commentsOverlay}>
+        <Pressable style={styles.commentsDismiss} onPress={() => setCommentsOpen(false)}>
+          <View
+            testID="post-comments-sheet"
+            style={[styles.commentsSheet, {paddingBottom: 16 + keyboardHeight}]}
+            onStartShouldSetResponder={() => true}>
+            <Text style={styles.reportTitle}>Comments {formatCount(post.engagement.commentsCount)}</Text>
+            <Text style={styles.reportSubtitle}>Write a comment on this post.</Text>
+            <TextInput
+              testID="post-comment-input"
+              value={commentDraft}
+              onChangeText={setCommentDraft}
+              placeholder="Write a comment"
+              placeholderTextColor={pastelColors.auth.mutedText}
+              multiline
+              style={styles.reportDetailsInput}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Send comment"
+              disabled={!commentDraft.trim() || commentSending}
+              onPress={async () => {
+                if (!commentDraft.trim() || commentSending) return;
+                setCommentSending(true);
+                try {
+                  await commentOnPost(post.id, commentDraft.trim());
+                  setCommentDraft('');
+                  setCommentsOpen(false);
+                  showToast('Comment sent');
+                } catch (err) {
+                  showToast('Could not send comment. Please try again.');
+                } finally {
+                  setCommentSending(false);
+                }
+              }}
+              style={[
+                styles.reportSubmit,
+                (!commentDraft.trim() || commentSending) && styles.reportSubmitDisabled,
+              ]}>
+              <Text style={styles.reportSubmitText}>
+                {commentSending ? 'Sending...' : 'Send comment'}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -726,6 +806,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(50, 17, 31, 0.26)',
   },
+  reportFlex: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   reportDialog: {
     width: '100%',
     maxWidth: 360,
@@ -830,6 +916,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 1,
+  },
+  commentsOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(50, 17, 31, 0.26)',
+  },
+  commentsDismiss: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  commentsSheet: {
+    padding: 16,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    backgroundColor: pastelColors.white,
   },
   rightActions: {
     flexDirection: 'row',

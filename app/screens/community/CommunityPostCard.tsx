@@ -1,7 +1,17 @@
-import React from 'react';
-import {Image, StyleSheet, Text, View} from 'react-native';
+import React, {useRef} from 'react';
+import {
+  Animated,
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
 import {pastelColors} from '../../theme/colors';
+import {aliasColor} from './communityUx';
 
 type Media = {
   type?: string;
@@ -16,6 +26,14 @@ type Props = {
   alias?: string;
   link?: string;
   compact?: boolean;
+  state?: string;
+  createdAt?: string;
+  timeLabel?: string;
+  onPressLink?: () => void;
+  queueStyle?: boolean;
+  showAvatar?: boolean;
+  showAnonymousLabel?: boolean;
+  onDoubleTapLike?: () => void;
 };
 
 function isVideo(media?: Media | null) {
@@ -31,61 +49,193 @@ export default function CommunityPostCard({
   alias,
   link,
   compact = false,
+  state,
+  timeLabel,
+  onPressLink,
+  queueStyle = false,
+  showAvatar = !queueStyle,
+  showAnonymousLabel = !queueStyle,
+  onDoubleTapLike,
 }: Props) {
   const uri = media?.url || media?.uri;
   const hasMedia = Boolean(uri);
   const hasText = Boolean(caption.trim());
+  const lastTap = useRef(0);
+  const heart = useRef(new Animated.Value(0)).current;
+
+  const burstHeart = () => {
+    heart.setValue(0);
+    Animated.sequence([
+      Animated.timing(heart, {toValue: 1, duration: 160, useNativeDriver: true}),
+      Animated.delay(420),
+      Animated.timing(heart, {toValue: 0, duration: 220, useNativeDriver: true}),
+    ]).start();
+  };
+
+  const handleMediaPress = () => {
+    if (!onDoubleTapLike) return;
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      lastTap.current = 0;
+      burstHeart();
+      onDoubleTapLike();
+      return;
+    }
+    lastTap.current = now;
+  };
 
   if (!hasMedia && !hasText) return null;
 
+  const mediaBody = hasMedia ? (
+    <View style={styles.mediaFrame}>
+      {isVideo(media) ? (
+        <Video
+          source={{uri}}
+          style={styles.media}
+          resizeMode="cover"
+          muted={false}
+          repeat={false}
+          paused
+          controls
+        />
+      ) : (
+        <Image source={{uri}} style={styles.media} resizeMode="cover" />
+      )}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.heartBurst,
+          {
+            opacity: heart,
+            transform: [
+              {
+                scale: heart.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.4, 1],
+                }),
+              },
+            ],
+          },
+        ]}>
+        <Feather name="heart" size={72} color={pastelColors.white} />
+      </Animated.View>
+    </View>
+  ) : null;
+
   return (
-    <View style={[styles.card, compact && styles.compact]}>
-      {alias ? <Text style={styles.alias}>{alias}</Text> : null}
-      {hasMedia ? (
-        <View style={styles.mediaFrame}>
-          {isVideo(media) ? (
-            <Video
-              source={{uri}}
-              style={styles.media}
-              resizeMode="contain"
-              muted={false}
-              repeat={false}
-              paused
-              controls
-            />
-          ) : (
-            <Image source={{uri}} style={styles.media} resizeMode="contain" />
-          )}
+    <View style={[styles.card, compact && styles.compact, queueStyle && styles.queueCard]}>
+      {alias ? (
+        <View style={styles.identity}>
+          {showAvatar ? (
+            <View style={[styles.avatar, {backgroundColor: aliasColor(alias)}]}>
+              <Text style={styles.avatarText}>{alias.trim().charAt(0).toUpperCase() || '?'}</Text>
+            </View>
+          ) : null}
+          <View style={styles.identityText}>
+            <Text style={styles.alias}>{alias}</Text>
+            {showAnonymousLabel || timeLabel ? (
+              <Text style={styles.meta}>
+                {showAnonymousLabel ? 'anonymous' : ''}
+                {showAnonymousLabel && timeLabel ? '  ' : ''}
+                {timeLabel || ''}
+              </Text>
+            ) : null}
+          </View>
+          {state ? <Text style={styles.state}>{state}</Text> : null}
         </View>
+      ) : null}
+      {hasMedia ? (
+        onDoubleTapLike ? (
+          <Pressable onPress={handleMediaPress} accessibilityRole="imagebutton">
+            {mediaBody}
+          </Pressable>
+        ) : (
+          mediaBody
+        )
       ) : null}
       {hasText ? (
         <Text style={[styles.caption, !hasMedia && styles.textOnly]}>{caption.trim()}</Text>
       ) : null}
-      {link ? <Text style={styles.link}>{link}</Text> : null}
+      {link ? (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`Open link ${link}`}
+          onPress={
+            onPressLink ||
+            (() => {
+              const href = /^(https?:)?\/\//i.test(link) ? link : `https://${link}`;
+              Linking.openURL(href).catch(() => undefined);
+            })
+          }>
+          <Text style={styles.link}>{link}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: pastelColors.auth.glassSurface,
+    alignSelf: 'stretch',
   },
+  queueCard: {backgroundColor: 'transparent'},
   compact: {backgroundColor: 'transparent'},
-  alias: {
+  identity: {
     paddingHorizontal: 14,
     paddingTop: 12,
-    fontWeight: '900',
-    color: pastelColors.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatar: {
+    height: 34,
+    width: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {color: pastelColors.auth.deepText, fontWeight: '900'},
+  identityText: {flex: 1},
+  alias: {fontWeight: '900', color: pastelColors.accent},
+  meta: {
+    marginTop: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: pastelColors.auth.mutedText,
+  },
+  state: {
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: pastelColors.white,
+    color: pastelColors.auth.mutedText,
+    fontSize: 11,
+    fontWeight: '800',
   },
   mediaFrame: {
     width: '100%',
+    alignSelf: 'stretch',
     aspectRatio: 1,
-    backgroundColor: pastelColors.auth.primaryOverlay,
+    maxHeight: 480,
+    backgroundColor: pastelColors.card,
     marginTop: 8,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  media: {width: '100%', height: '100%'},
+  media: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  heartBurst: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   caption: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -98,7 +248,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '700',
-    paddingTop: 16,
+    paddingTop: 12,
   },
   link: {
     paddingHorizontal: 14,

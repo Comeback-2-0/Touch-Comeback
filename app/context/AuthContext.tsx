@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         const tokens = await getAuthTokens();
         if (!tokens?.accessToken) return;
 
-        const response = await api.get('/auth/me');
+        const response = await api.get('/auth/me', {timeout: 12_000});
         setUser(response.data.user);
       } catch (err) {
         await clearAuthTokens();
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       const credential = GoogleAuthProvider.credential(idToken);
       await signInWithCredential(auth, credential);
 
-      const response = await axios.post(`${API_URL}/auth/google`, {idToken});
+      const response = await axios.post(`${API_URL}/auth/google`, {idToken}, {timeout: 15_000});
 
       await saveAuthTokens({
         accessToken: response.data.accessToken,

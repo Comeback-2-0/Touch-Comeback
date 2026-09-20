@@ -1,8 +1,9 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
+  Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -18,6 +19,18 @@ import {useAuthStore} from '../../features/profile/store/authStore';
 import type {CommunityStackParamList} from '../../navigation/CommunityStack';
 import CommunityJoinRequestSheet from './CommunityJoinRequestSheet';
 import CommunityPostCard from './CommunityPostCard';
+import CommunityConfirmSheet from './CommunityConfirmSheet';
+import {useBlockedCommunitiesStore} from './blockedCommunitiesStore';
+import {
+  communityErrorCopy,
+  countThreadComments,
+  joinModeLabel,
+  leaveConsequenceCopy,
+  membersCopy,
+  showCommunityToast,
+  splitRules,
+  visibilityLabel,
+} from './communityUx';
 
 type Route = RouteProp<CommunityStackParamList, 'CommunityHome'>;
 type Navigation = NativeStackNavigationProp<CommunityStackParamList>;
@@ -27,9 +40,16 @@ type Post = {
   text: string;
   score: number;
   comments: unknown[];
+  commentsCount?: number;
   link?: string;
   media?: {type?: string; url?: string; mimeType?: string} | null;
+  state?: string;
+  pinned?: boolean;
+  publishedAt?: string;
+  createdAt?: string;
 };
+
+const FEED_PAGE_SIZE = 20;
 type JoinRequest = {
   id: string;
   status: 'pending' | 'approved' | 'declined' | string;
@@ -44,63 +64,149 @@ function ScreenHeader({title, onBack}: {title: string; onBack: () => void}) {
       <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} style={styles.iconButton}>
         <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
       </Pressable>
-      <Text numberOfLines={1} style={styles.head}>{title}</Text>
-      <View style={styles.headerSpacer} />
+      <Text numberOfLines={1} style={[styles.head, {flex: 1}]}>
+        {title}
+      </Text>
+      <View style={styles.iconButton} />
+    </View>
+  );
+}
+
+function HeroSkeleton() {
+  return (
+    <View style={styles.hero}>
+      <View style={styles.heroSkeletonAvatar} />
+      <View style={[styles.skeletonLine, {width: '55%', marginTop: 14}]} />
+      <View style={[styles.skeletonLine, {width: '80%', marginTop: 10}]} />
     </View>
   );
 }
 
 export default function CommunityHomeScreen() {
   const navigation = useNavigation<Navigation>();
-  const {params: {community: routeCommunity}} = useRoute<Route>();
-  const id = routeCommunity.id || routeCommunity._id;
+  const {params} = useRoute<Route>();
+  const routeCommunity = params.community;
+  const id = routeCommunity?.id || routeCommunity?._id || params.communityId || '';
   const username =
     useAuthStore(state => state.profile?.username) ||
     useAuthStore(state => state.user?.username) ||
     '';
 
-  const [community, setCommunity] = useState<any>(routeCommunity);
+  const [community, setCommunity] = useState<any>(routeCommunity || {id, name: 'Community'});
   const [posts, setPosts] = useState<Post[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [queueCount, setQueueCount] = useState(0);
   const [membership, setMembership] = useState<any>();
   const [joinRequest, setJoinRequest] = useState<JoinRequest | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [rulesExpanded, setRulesExpanded] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const blockCommunity = useBlockedCommunitiesStore(state => state.block);
+  const listRef = useRef<FlatList<Post>>(null);
+  const stickToLatestRef = useRef(true);
+  const loadingOlderRef = useRef(false);
 
   const joined = membership?.status === 'active';
   const manager = ['owner', 'moderator'].includes(membership?.role);
   const pending = joinRequest?.status === 'pending';
   const declined = joinRequest?.status === 'declined';
+  const visibleRules = useMemo(
+    () => splitRules(community?.rules, rulesExpanded ? 12 : 3),
+    [community?.rules, rulesExpanded],
+  );
 
-  const load = useCallback(async ({refresh = false} = {}) => {
-    if (refresh) setRefreshing(true);
-    else setLoading(true);
-    setError(false);
+  useEffect(() => {
+    stickToLatestRef.current = true;
+    setNextCursor(null);
+  }, [id]);
+
+  const scrollToLatest = useCallback((animated = false) => {
+    if (!posts.length) return;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({animated});
+    });
+  }, [posts.length]);
+
+  const mergeChronological = useCallback((incomingNewestFirst: Post[], mode: 'replace' | 'prepend') => {
+    const chronological = [...incomingNewestFirst].reverse();
+    if (mode === 'replace') return chronological;
+    setPosts(current => {
+      const seen = new Set(current.map(post => post.id));
+      return [...chronological.filter(post => !seen.has(post.id)), ...current];
+    });
+    return chronological;
+  }, []);
+
+  const loadOlder = useCallback(async () => {
+    if (!nextCursor || loadingOlderRef.current) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
     try {
-      const info = await api.get(`/communities/${id}`);
-      const nextCommunity = info.data.community || routeCommunity;
-      const m = info.data.membership;
-      setCommunity(nextCommunity);
-      setMembership(m);
-      setJoinRequest(info.data.joinRequest || null);
-      setPendingCount(Number(info.data.pendingJoinRequestCount || 0));
-      if (nextCommunity?.contentVisibility !== 'members' || m?.status === 'active') {
-        const feed = await api.get(`/communities/${id}/content/feed`);
-        setPosts(feed.data.posts || []);
-      } else {
-        setPosts([]);
-      }
+      const feed = await api.get<{posts: Post[]; nextCursor?: string | null}>(
+        `/communities/${id}/content/feed`,
+        {params: {limit: FEED_PAGE_SIZE, before: nextCursor}},
+      );
+      mergeChronological(feed.data.posts || [], 'prepend');
+      setNextCursor(feed.data.nextCursor || null);
     } catch {
-      setError(true);
+      // Keep current page; user can scroll up again.
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
     }
-  }, [id, routeCommunity]);
+  }, [id, mergeChronological, nextCursor]);
+
+  const load = useCallback(
+    async ({refresh = false} = {}) => {
+      if (refresh) setRefreshing(true);
+      else setLoading(true);
+      setError('');
+      try {
+        const info = await api.get(`/communities/${id}`);
+        const nextCommunity = info.data.community || routeCommunity || {id, name: 'Community'};
+        const m = info.data.membership;
+        setCommunity(nextCommunity);
+        setMembership(m);
+        setJoinRequest(info.data.joinRequest || null);
+        setPendingCount(Number(info.data.pendingJoinRequestCount || 0));
+        setMuted(Boolean(info.data.muted ?? m?.muted));
+        if (nextCommunity?.contentVisibility !== 'members' || m?.status === 'active') {
+          const [feed, queue] = await Promise.all([
+            api.get<{posts: Post[]; nextCursor?: string | null}>(`/communities/${id}/content/feed`, {
+              params: {limit: FEED_PAGE_SIZE},
+            }),
+            m?.status === 'active'
+              ? api.get(`/communities/${id}/content/queue`).catch(() => ({data: {posts: []}}))
+              : Promise.resolve({data: {posts: []}}),
+          ]);
+          setPosts(mergeChronological(feed.data.posts || [], 'replace'));
+          setNextCursor(feed.data.nextCursor || null);
+          setQueueCount((queue.data.posts || []).length);
+          if (!refresh) stickToLatestRef.current = true;
+        } else {
+          setPosts([]);
+          setNextCursor(null);
+          setQueueCount(0);
+        }
+      } catch (err: any) {
+        setError(communityErrorCopy(err, 'Could not load this community.'));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [id, mergeChronological, routeCommunity],
+  );
 
   useEffect(() => {
     load();
@@ -109,6 +215,7 @@ export default function CommunityHomeScreen() {
   const joinOpen = async () => {
     try {
       await api.post(`/communities/${id}/join`);
+      showCommunityToast('Joined anonymously');
       await load();
     } catch {
       Alert.alert('Could not join', 'Please try again in a moment.');
@@ -139,6 +246,7 @@ export default function CommunityHomeScreen() {
       const response = await api.post(`/communities/${id}/join`, payload);
       setJoinRequest(response.data.joinRequest || response.data.request || null);
       setSheetOpen(false);
+      showCommunityToast('Request sent');
       await load();
     } catch (err: any) {
       Alert.alert(
@@ -160,51 +268,82 @@ export default function CommunityHomeScreen() {
     }
   };
 
-  const memberOptions = () =>
-    Alert.alert('Community options', '', [
-      {
-        text: muted ? 'Unmute notifications' : 'Mute notifications',
-        onPress: async () => {
-          try {
-            const nextMuted = !muted;
-            await api.put(`/communities/${id}/mute`, {muted: nextMuted});
-            setMuted(nextMuted);
-          } catch {
-            Alert.alert('Could not update notifications', 'Please try again.');
-          }
-        },
-      },
-      {
-        text: 'Leave community',
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert(
-            'Leave community?',
-            community?.contentVisibility === 'members'
-              ? 'You may need approval or an invite to come back.'
-              : 'You can join again later.',
-            [
-              {text: 'Cancel', style: 'cancel'},
-              {
-                text: 'Leave',
-                style: 'destructive',
-                onPress: async () => {
-                  try {
-                    await api.post(`/communities/${id}/leave`);
-                    navigation.goBack();
-                  } catch {
-                    Alert.alert('Could not leave community', 'Please try again.');
-                  }
-                },
-              },
-            ],
-          ),
-      },
-      {text: 'Cancel', style: 'cancel'},
-    ]);
+  const toggleMute = async () => {
+    try {
+      const nextMuted = !muted;
+      await api.put(`/communities/${id}/mute`, {muted: nextMuted});
+      setMuted(nextMuted);
+      setOptionsOpen(false);
+      showCommunityToast(nextMuted ? 'Community muted.' : 'Notifications on.');
+    } catch {
+      Alert.alert('Could not update notifications', 'Please try again.');
+    }
+  };
+
+  const confirmLeave = () => {
+    setOptionsOpen(false);
+    setLeaveConfirmOpen(true);
+  };
+
+  const leaveCommunity = async () => {
+    setActionBusy(true);
+    try {
+      await api.post(`/communities/${id}/leave`);
+      setLeaveConfirmOpen(false);
+      navigation.goBack();
+    } catch {
+      Alert.alert('Could not leave community', 'Please try again.');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const blockThisCommunity = async () => {
+    setActionBusy(true);
+    try {
+      await api.put(`/communities/${id}/mute`, {muted: true}).catch(() => undefined);
+      await api.post(`/communities/${id}/leave`).catch(() => undefined);
+      blockCommunity(id);
+      setBlockConfirmOpen(false);
+      setOptionsOpen(false);
+      showCommunityToast('Community blocked.');
+      navigation.navigate('CommunityBrowse');
+    } catch {
+      Alert.alert('Could not block community', 'Please try again.');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const primaryJoinLabel = () => {
+    if (community?.joinMode === 'approval') return 'Request to join';
+    if (community?.joinMode === 'invite-only') return 'Enter invite code';
+    return 'Join anonymously';
+  };
 
   const statusBlock = () => {
-    if (joined) return null;
+    if (joined) {
+      return (
+        <View style={styles.ctaRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Post anonymously"
+            onPress={() => navigation.navigate('CommunityCompose', {community})}
+            style={styles.button}>
+            <Feather name="edit-3" size={16} color={pastelColors.white} />
+            <Text style={styles.buttonText}>Post anonymously</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Vote in review queue"
+            onPress={() => navigation.navigate('CommunityQueue', {community})}
+            style={styles.secondaryButton}>
+            <Feather name="list" size={16} color={pastelColors.auth.deepText} />
+            <Text style={styles.secondaryButtonText}>Vote in queue</Text>
+          </Pressable>
+        </View>
+      );
+    }
     if (pending) {
       return (
         <View style={styles.statusBox}>
@@ -227,43 +366,56 @@ export default function CommunityHomeScreen() {
         </View>
       );
     }
-    if (community?.joinMode === 'invite-only') {
-      return (
-        <View style={styles.statusBox}>
-          <Text style={styles.statusTitle}>Invite required</Text>
-          <Text style={styles.copy}>Ask a member or moderator for a private invite link.</Text>
-          <Pressable onPress={() => navigation.navigate('CommunityInvite', {community})} style={styles.button}>
-            <Text style={styles.buttonText}>Enter invite code</Text>
-          </Pressable>
-        </View>
-      );
-    }
     return (
       <Pressable onPress={openJoinFlow} style={styles.button}>
-        <Text style={styles.buttonText}>
-          {community?.contentVisibility === 'members' ? 'Join community' : 'Join to post'}
-        </Text>
+        <Text style={styles.buttonText}>{primaryJoinLabel()}</Text>
       </Pressable>
     );
   };
+
+  const hero = (
+    <View style={styles.hero}>
+      {community?.image ? (
+        <Image source={{uri: community.image}} style={styles.heroImage} />
+      ) : (
+        <View style={styles.heroFallback}>
+          <Feather name="users" size={28} color={pastelColors.accent} />
+        </View>
+      )}
+      <Text style={styles.heroTitle}>{community.name}</Text>
+      <Text style={styles.copy}>
+        {community.description || 'An anonymous space to speak freely and safely.'}
+      </Text>
+      <Text style={styles.members}>{membersCopy(community.membersCount)}</Text>
+      <View style={styles.badges}>
+        <Text style={styles.badge}>{visibilityLabel(community.contentVisibility)}</Text>
+        <Text style={styles.badge}>{joinModeLabel(community.joinMode)}</Text>
+        <Text style={styles.badge}>
+          {queueCount > 0 ? `${queueCount} in queue` : 'Feed ready'}
+        </Text>
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
         <ScreenHeader title={community?.name || 'Community'} onBack={() => navigation.goBack()} />
-        <View style={styles.center}>
-          <ActivityIndicator color={pastelColors.accent} />
+        <View style={styles.list}>
+          <HeroSkeleton />
+          <View style={styles.feedSkeleton} />
+          <View style={styles.feedSkeleton} />
         </View>
       </SafeAreaView>
     );
   }
 
-  if (error) {
+  if (error && !community?.name) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ScreenHeader title={community?.name || 'Community'} onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Community" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
-          <Text style={styles.title}>Could not load this community</Text>
+          <Text style={styles.title}>{error}</Text>
           <Pressable onPress={() => load()} style={styles.button}>
             <Text style={styles.buttonText}>Retry</Text>
           </Pressable>
@@ -276,13 +428,16 @@ export default function CommunityHomeScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <ScreenHeader title={community.name} onBack={() => navigation.goBack()} />
-        <View style={styles.center}>
-          <Feather name="lock" size={28} color={pastelColors.accent} />
-          <Text style={styles.title}>{community.name}</Text>
-          <Text style={styles.copy}>
-            {community.description || 'Join to view this anonymous community.'}
-          </Text>
-          {statusBlock()}
+        <View style={styles.locked}>
+          {hero}
+          <View style={styles.lockCard}>
+            <Feather name="lock" size={22} color={pastelColors.accent} />
+            <Text style={styles.lockTitle}>This space is private</Text>
+            <Text style={styles.copy}>
+              Join to see posts, rules, and queue activity.
+            </Text>
+            {statusBlock()}
+          </View>
         </View>
         <CommunityJoinRequestSheet
           visible={sheetOpen}
@@ -298,57 +453,163 @@ export default function CommunityHomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.iconButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => navigation.goBack()}
+          style={styles.iconButton}>
           <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
         </Pressable>
-        <Text style={styles.head}>{community.name}</Text>
+        <Text numberOfLines={1} style={[styles.head, {flex: 1}]}>
+          {community.name}
+        </Text>
         <View style={styles.actions}>
+          {joined ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={muted ? 'Unmute community' : 'Mute community'}
+              onPress={async () => {
+                try {
+                  const nextMuted = !muted;
+                  await api.put(`/communities/${id}/mute`, {muted: nextMuted});
+                  setMuted(nextMuted);
+                  showCommunityToast(nextMuted ? 'Community muted.' : 'Notifications on.');
+                } catch {
+                  Alert.alert('Could not update notifications', 'Please try again.');
+                }
+              }}
+              style={styles.iconButton}>
+              <Feather
+                name={muted ? 'bell-off' : 'bell'}
+                size={20}
+                color={pastelColors.auth.deepText}
+              />
+            </Pressable>
+          ) : null}
           {manager ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Manage community"
               onPress={() => navigation.navigate('CommunityManage', {community})}
-              style={styles.manageButton}>
+              style={styles.headerAction}>
               <Feather name="settings" size={20} color={pastelColors.auth.deepText} />
+              <Text style={styles.headerActionText}>Manage</Text>
               {pendingCount > 0 ? (
-                <View style={styles.badge}>
+                <View style={styles.badgeDot}>
                   <Text style={styles.badgeText}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
                 </View>
               ) : null}
             </Pressable>
           ) : null}
           {joined ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Community options" onPress={memberOptions} style={styles.iconButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Community options"
+              onPress={() => setOptionsOpen(true)}
+              style={styles.iconButton}>
               <Feather name="more-horizontal" size={20} color={pastelColors.auth.deepText} />
             </Pressable>
           ) : null}
           {joined ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Review queue" onPress={() => navigation.navigate('CommunityQueue', {community})} style={styles.iconButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Review queue. Queue is where members vote before posts go live."
+              onPress={() => navigation.navigate('CommunityQueue', {community})}
+              style={styles.headerAction}>
               <Feather name="list" size={20} color={pastelColors.auth.deepText} />
+              <Text style={styles.headerActionText}>Queue</Text>
             </Pressable>
           ) : null}
           {joined ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Submit post" onPress={() => navigation.navigate('CommunityCompose', {community})} style={styles.iconButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Submit post"
+              onPress={() => navigation.navigate('CommunityCompose', {community})}
+              style={styles.headerAction}>
               <Feather name="plus-square" size={21} color={pastelColors.auth.deepText} />
+              <Text style={styles.headerActionText}>Post</Text>
             </Pressable>
           ) : null}
         </View>
       </View>
 
       <FlatList
+        ref={listRef}
         data={posts}
         keyExtractor={p => p.id}
         refreshing={refreshing}
         onRefresh={() => load({refresh: true})}
         contentContainerStyle={posts.length ? styles.list : styles.empty}
+        maintainVisibleContentPosition={{minIndexForVisible: 1}}
+        onScroll={({nativeEvent}) => {
+          if (nativeEvent.contentOffset.y < 80) loadOlder();
+        }}
+        scrollEventThrottle={160}
+        onContentSizeChange={() => {
+          if (stickToLatestRef.current && posts.length) {
+            scrollToLatest(false);
+            stickToLatestRef.current = false;
+          }
+        }}
+        onLayout={() => {
+          if (stickToLatestRef.current && posts.length) {
+            scrollToLatest(false);
+          }
+        }}
         ListHeaderComponent={
           <View style={styles.about}>
-            <Text style={styles.title}>{community.name}</Text>
-            <Text style={styles.copy}>{community.description}</Text>
-            <Text style={styles.members}>
-              {community.membersCount || 0} members · Anonymous feed
-            </Text>
+            {loadingOlder ? (
+              <Text style={styles.loadingOlder}>Loading earlier posts...</Text>
+            ) : nextCursor ? (
+              <Pressable onPress={loadOlder} style={styles.loadOlderButton}>
+                <Text style={styles.loadOlderText}>Load earlier posts</Text>
+              </Pressable>
+            ) : null}
+            {hero}
+            {joined ? (
+              <View style={styles.privacyNote}>
+                <Feather name="shield" size={17} color={pastelColors.accent} />
+                <Text style={styles.privacyNoteText}>
+                  Your real profile is hidden here. A fresh alias is used for every post.
+                </Text>
+              </View>
+            ) : null}
+            {visibleRules.length && joined ? (
+              <View style={styles.rulesBox}>
+                <Text style={styles.rulesTitle}>Before you post here</Text>
+                {visibleRules.map(rule => (
+                  <Text key={rule} style={styles.ruleBullet}>
+                    {`- ${rule}`}
+                  </Text>
+                ))}
+                {String(community.rules || '').length > 80 ? (
+                  <Pressable onPress={() => setRulesExpanded(value => !value)}>
+                    <Text style={styles.rulesMore}>
+                      {rulesExpanded ? 'Show fewer rules' : 'View all rules'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
             {statusBlock()}
+            <View style={styles.sectionHead}>
+              <View>
+                <Text style={styles.sectionTitle}>Published feed</Text>
+                <Text style={styles.sectionCopy}>Published by community vote</Text>
+              </View>
+              {joined ? (
+                <Pressable onPress={() => navigation.navigate('CommunityQueue', {community})}>
+                  <Text style={styles.sectionLink}>
+                    Review queue{queueCount ? ` (${queueCount})` : ''}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {joined ? (
+              <Text style={styles.queueHint}>
+                Queue is where members vote before posts go live.
+              </Text>
+            ) : null}
           </View>
         }
         renderItem={({item}) => (
@@ -356,20 +617,37 @@ export default function CommunityHomeScreen() {
             onPress={() => navigation.navigate('CommunityPost', {community, contentId: item.id})}
             style={styles.card}>
             <CommunityPostCard
+              compact
               alias={item.alias}
               caption={item.text}
               media={item.media}
               link={item.link}
+              state={item.pinned ? 'Pinned' : 'Published'}
             />
-            <Text style={styles.meta}>
-              {item.score} votes · {item.comments.length} comments
-            </Text>
+            <View style={styles.feedActions}>
+              <View style={styles.feedAction}>
+                <Feather name="message-circle" size={20} color={pastelColors.auth.deepText} />
+                <Text style={styles.feedActionText}>
+                  {Number(item.commentsCount ?? countThreadComments(item.comments as any))}
+                </Text>
+              </View>
+              <Text style={styles.feedMeta}>Published</Text>
+            </View>
           </Pressable>
         )}
         ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={styles.title}>Nothing published yet</Text>
-            <Text style={styles.copy}>Submissions are still in review.</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.title}>No posts yet. Be the first voice here.</Text>
+            <Text style={styles.copy}>
+              Submissions start in the review queue before they become public.
+            </Text>
+            {joined ? (
+              <Pressable
+                onPress={() => navigation.navigate('CommunityCompose', {community})}
+                style={styles.button}>
+                <Text style={styles.buttonText}>Post anonymously</Text>
+              </Pressable>
+            ) : null}
           </View>
         }
       />
@@ -380,6 +658,58 @@ export default function CommunityHomeScreen() {
         submitting={sending}
         onClose={() => setSheetOpen(false)}
         onSubmit={sendRequest}
+      />
+
+      <Modal visible={optionsOpen} transparent animationType="slide" onRequestClose={() => setOptionsOpen(false)}>
+        <View style={styles.optionsOverlay}>
+          <Pressable style={styles.optionsBackdrop} onPress={() => setOptionsOpen(false)} />
+          <View style={styles.optionsSheet}>
+            <Text style={styles.optionsTitle}>Community options</Text>
+            <Pressable onPress={toggleMute} style={styles.optionsRow}>
+              <Feather name={muted ? 'bell-off' : 'bell'} size={18} color={pastelColors.auth.deepText} />
+              <Text style={styles.optionsRowText}>
+                Notifications: {muted ? 'Muted' : 'On'}
+              </Text>
+            </Pressable>
+            <Pressable onPress={confirmLeave} style={styles.optionsRow}>
+              <Feather name="log-out" size={18} color="#C45C5C" />
+              <Text style={[styles.optionsRowText, styles.destructiveText]}>Leave community</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setOptionsOpen(false);
+                setBlockConfirmOpen(true);
+              }}
+              style={styles.optionsRow}>
+              <Feather name="slash" size={18} color="#C45C5C" />
+              <Text style={[styles.optionsRowText, styles.destructiveText]}>Block this community</Text>
+            </Pressable>
+            <Pressable onPress={() => setOptionsOpen(false)} style={styles.optionsCancel}>
+              <Text style={styles.optionsCancelText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <CommunityConfirmSheet
+        visible={leaveConfirmOpen}
+        title="Leave community?"
+        message={leaveConsequenceCopy(community?.joinMode)}
+        confirmLabel="Leave"
+        destructive
+        busy={actionBusy}
+        onConfirm={leaveCommunity}
+        onCancel={() => setLeaveConfirmOpen(false)}
+      />
+      <CommunityConfirmSheet
+        visible={blockConfirmOpen}
+        title="Block this community?"
+        message="We will mute notifications, leave the space, and hide it from your browse list for this session."
+        confirmLabel="Block community"
+        destructive
+        busy={actionBusy}
+        onConfirm={blockThisCommunity}
+        onCancel={() => setBlockConfirmOpen(false)}
       />
     </SafeAreaView>
   );
@@ -393,12 +723,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  head: {maxWidth: '50%', fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
-  headerSpacer: {width: 48},
+  head: {flexShrink: 1, minWidth: 0, fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
   iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
-  actions: {flexDirection: 'row', alignItems: 'center'},
-  manageButton: {position: 'relative', height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
-  badge: {
+  actions: {flexDirection: 'row', alignItems: 'center', gap: 2},
+  headerAction: {
+    position: 'relative',
+    minHeight: 44,
+    minWidth: 50,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionText: {
+    marginTop: 1,
+    fontSize: 10,
+    fontWeight: '900',
+    color: pastelColors.auth.mutedText,
+  },
+  badgeDot: {
     position: 'absolute',
     top: -4,
     right: -8,
@@ -412,47 +754,213 @@ const styles = StyleSheet.create({
   },
   badgeText: {color: pastelColors.white, fontSize: 10, fontWeight: '900'},
   center: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24},
+  locked: {flex: 1, padding: 16},
   title: {fontSize: 20, fontWeight: '900', color: pastelColors.auth.deepText, textAlign: 'center'},
   copy: {
     marginTop: 6,
     color: pastelColors.auth.mutedText,
     fontWeight: '700',
     textAlign: 'center',
+    lineHeight: 20,
   },
   button: {
     alignSelf: 'center',
     marginTop: 16,
+    minHeight: 44,
     paddingVertical: 11,
     paddingHorizontal: 18,
     borderRadius: 14,
     backgroundColor: pastelColors.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   buttonText: {color: pastelColors.white, fontWeight: '900'},
   secondaryButton: {
     alignSelf: 'center',
     marginTop: 12,
+    minHeight: 44,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 14,
     backgroundColor: pastelColors.auth.glassSurface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   secondaryButtonText: {color: pastelColors.auth.deepText, fontWeight: '800'},
+  ctaRow: {marginTop: 8, alignItems: 'center'},
   statusBox: {marginTop: 16, alignItems: 'center'},
   statusTitle: {fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
   list: {padding: 16},
   empty: {flexGrow: 1, padding: 16},
-  about: {paddingBottom: 16},
+  about: {paddingBottom: 8},
+  loadingOlder: {
+    marginBottom: 10,
+    textAlign: 'center',
+    color: pastelColors.auth.mutedText,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  loadOlderButton: {
+    alignSelf: 'center',
+    marginBottom: 12,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+  },
+  loadOlderText: {
+    color: pastelColors.accent,
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  hero: {
+    padding: 18,
+    borderRadius: 22,
+    backgroundColor: pastelColors.white,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.04)',
+    shadowColor: '#32111F',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: {width: 0, height: 3},
+    elevation: 2,
+  },
+  heroImage: {height: 84, width: 84, borderRadius: 24},
+  heroFallback: {
+    height: 84,
+    width: 84,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.auth.primaryOverlay,
+  },
+  heroTitle: {
+    marginTop: 12,
+    fontSize: 24,
+    fontWeight: '900',
+    color: pastelColors.auth.deepText,
+    textAlign: 'center',
+  },
   members: {marginTop: 8, color: pastelColors.accent, fontWeight: '800', textAlign: 'center'},
+  badges: {marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6},
+  badge: {
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: pastelColors.auth.glassSurface,
+    color: pastelColors.auth.mutedText,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  lockCard: {
+    marginTop: 14,
+    padding: 18,
+    borderRadius: 18,
+    backgroundColor: pastelColors.auth.primaryOverlay,
+    alignItems: 'center',
+  },
+  lockTitle: {marginTop: 8, fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
+  privacyNote: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: pastelColors.auth.glassSurface,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  privacyNoteText: {flex: 1, color: pastelColors.auth.mutedText, fontWeight: '700', lineHeight: 18},
+  rulesBox: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: pastelColors.white,
+  },
+  rulesTitle: {fontWeight: '900', color: pastelColors.auth.deepText, marginBottom: 6},
+  ruleBullet: {marginTop: 4, color: pastelColors.auth.mutedText, fontWeight: '700', lineHeight: 18},
+  rulesMore: {marginTop: 10, color: pastelColors.accent, fontWeight: '900'},
+  sectionHead: {
+    marginTop: 22,
+    marginBottom: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  sectionTitle: {fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
+  sectionCopy: {marginTop: 2, color: pastelColors.auth.mutedText, fontWeight: '700', fontSize: 12},
+  sectionLink: {color: pastelColors.accent, fontWeight: '900'},
+  queueHint: {
+    marginBottom: 10,
+    color: pastelColors.auth.mutedText,
+    fontWeight: '600',
+    fontSize: 12,
+  },
   card: {
     marginBottom: 10,
     borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.04)',
   },
+  feedActions: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  feedAction: {flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44},
+  feedActionText: {fontWeight: '900', color: pastelColors.auth.deepText, fontSize: 13},
+  feedMeta: {color: pastelColors.auth.mutedText, fontWeight: '700', fontSize: 12},
   meta: {
     paddingHorizontal: 14,
     paddingBottom: 12,
     color: pastelColors.auth.mutedText,
     fontWeight: '700',
   },
+  emptyState: {alignItems: 'center', paddingVertical: 24},
+  heroSkeletonAvatar: {
+    height: 84,
+    width: 84,
+    borderRadius: 24,
+    backgroundColor: pastelColors.auth.glassSurface,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 8,
+    backgroundColor: pastelColors.auth.glassSurface,
+    alignSelf: 'center',
+  },
+  feedSkeleton: {
+    marginTop: 12,
+    height: 120,
+    borderRadius: 18,
+    backgroundColor: pastelColors.white,
+  },
+  optionsOverlay: {flex: 1, justifyContent: 'flex-end'},
+  optionsBackdrop: {...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(50, 17, 31, 0.28)'},
+  optionsSheet: {
+    padding: 20,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: pastelColors.auth.background,
+  },
+  optionsTitle: {fontSize: 20, fontWeight: '900', color: pastelColors.auth.deepText, marginBottom: 8},
+  optionsRow: {
+    minHeight: 48,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: pastelColors.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  optionsRowText: {fontWeight: '800', color: pastelColors.auth.deepText},
+  destructiveText: {color: '#C45C5C'},
+  optionsCancel: {marginTop: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center'},
+  optionsCancelText: {fontWeight: '800', color: pastelColors.auth.mutedText},
 });

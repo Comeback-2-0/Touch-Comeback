@@ -77,6 +77,7 @@ export default function ProfileSetupScreen() {
       onSwitchAccount={signOut}
       image={imagePicker.image}
       onPickImage={imagePicker.pickImage}
+      onAdjustImage={imagePicker.adjustImage}
       onSubmit={handleSubmit}
       submitting={completeMutation.isPending}
       uploading={uploadMutation.isPending}

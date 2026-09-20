@@ -128,7 +128,7 @@ describe('AppStack', () => {
     expect(mockTabIcons).toEqual({
       Home: 'Feather:home',
       SearchBar: 'Feather:search',
-      ChatTab: 'Ionicons:chatbubbles-outline',
+      ChatTab: 'Feather:users',
       Reels: 'Feather:smartphone',
       ProfileTab: 'Feather:user',
     });
@@ -148,7 +148,14 @@ describe('AppStack', () => {
     });
 
     const options = mockTabScreenOptions({route: {name: 'Home'}});
-    expect(options.tabBarStyle).toEqual(expect.objectContaining({backgroundColor: '#FFC0CB'}));
+    expect(options.tabBarHideOnKeyboard).toBe(true);
+    expect(options.tabBarStyle).toEqual(
+      expect.objectContaining({
+        backgroundColor: '#FFC0CB',
+        borderTopWidth: 0,
+        elevation: 10,
+      }),
+    );
     expect(options.tabBarStyle).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({

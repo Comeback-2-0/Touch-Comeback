@@ -26,7 +26,7 @@ export const pastelColors = {
     primaryOverlay: 'rgba(244, 143, 177, 0.24)',
     shimmerBase: 'rgba(255, 239, 243, 0.86)',
     shimmerHighlight: 'rgba(255, 255, 255, 0.72)',
-    mutedText: '#6B4B58',
+    mutedText: '#5A3D49',
     deepText: '#32111F',
     errorSurface: 'rgba(255, 235, 238, 0.94)',
     successSurface: 'rgba(232, 245, 238, 0.94)',

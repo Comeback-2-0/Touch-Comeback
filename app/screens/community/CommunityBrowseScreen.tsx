@@ -1,6 +1,6 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
-  ActivityIndicator,
+  AccessibilityInfo,
   Animated,
   FlatList,
   Image,
@@ -17,18 +17,98 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {api} from '../../utils/api';
 import {pastelColors} from '../../theme/colors';
 import type {CommunityStackParamList, CommunitySummary} from '../../navigation/CommunityStack';
+import {
+  browseStatusLine,
+  communityAvatarColor,
+  communityErrorCopy,
+  communityInitial,
+} from './communityUx';
+import {useBlockedCommunitiesStore} from './blockedCommunitiesStore';
+import PreviewMarqueeText from './PreviewMarqueeText';
 
 type Navigation = NativeStackNavigationProp<CommunityStackParamList>;
 type BrowseMode = 'trending' | 'mine';
 
-function describeJoinMode(item: CommunitySummary) {
-  if (item.joinMode === 'approval') return 'Approval';
-  if (item.joinMode === 'invite-only') return 'Invite only';
-  return 'Open';
+function SkeletonCard() {
+  return (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonAvatar} />
+      <View style={styles.skeletonBody}>
+        <View style={[styles.skeletonLine, {width: '58%'}]} />
+        <View style={[styles.skeletonLine, {width: '84%', marginTop: 10}]} />
+        <View style={[styles.skeletonLine, {width: '46%', marginTop: 10}]} />
+      </View>
+    </View>
+  );
 }
 
-function describeVisibility(item: CommunitySummary) {
-  return item.contentVisibility === 'members' ? 'Members only' : 'Public feed';
+function CommunityAvatar({name, image}: {name: string; image?: string}) {
+  if (image) {
+    return <Image source={{uri: image}} style={styles.avatar} />;
+  }
+  const bg = communityAvatarColor(name);
+  return (
+    <View style={[styles.avatar, styles.avatarFallback, {backgroundColor: bg}]}>
+      <Text style={styles.avatarInitial} maxFontSizeMultiplier={1.2}>
+        {communityInitial(name)}
+      </Text>
+    </View>
+  );
+}
+
+function IntroAtmosphere({reduceMotion}: {reduceMotion: boolean}) {
+  const drift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reduceMotion) {
+      drift.setValue(0);
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drift, {toValue: 1, duration: 4200, useNativeDriver: true}),
+        Animated.timing(drift, {toValue: 0, duration: 4200, useNativeDriver: true}),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [drift, reduceMotion]);
+
+  const shift = drift.interpolate({inputRange: [0, 1], outputRange: [0, 8]});
+
+  return (
+    <View style={styles.introCard} accessibilityRole="summary">
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.introBlob, styles.introBlobOne, {transform: [{translateX: shift}]}]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.introBlob,
+          styles.introBlobTwo,
+          {
+            transform: [
+              {
+                translateY: drift.interpolate({inputRange: [0, 1], outputRange: [0, -6]}),
+              },
+            ],
+          },
+        ]}
+      />
+      <View style={styles.introDotRow}>
+        <View style={[styles.introDot, {backgroundColor: '#F2A0B8'}]} />
+        <View style={[styles.introDot, {backgroundColor: '#8EC5E8'}]} />
+        <View style={[styles.introDot, {backgroundColor: '#C4A8E8'}]} />
+      </View>
+      <Text style={styles.introTitle} maxFontSizeMultiplier={1.35}>
+        Say what you can't say elsewhere
+      </Text>
+      <Text style={styles.introCopy} maxFontSizeMultiplier={1.4}>
+        Join anonymous corners built around mood, stories, help, jokes, and quiet honesty.
+      </Text>
+    </View>
+  );
 }
 
 export default function CommunityBrowseScreen() {
@@ -40,36 +120,60 @@ export default function CommunityBrowseScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const searchProgress = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
+  const blockedIds = useBlockedCommunitiesStore(state => state.blockedIds);
 
-  const load = useCallback(async ({refresh = false} = {}) => {
-    if (refresh) {
-      setRefreshing(true);
-    } else if (!communities.length) {
-      setInitialLoading(true);
-    }
-    setError('');
-    try {
-      if (mode === 'mine') {
-        const response = await api.get<{communities: CommunitySummary[]}>('/communities/mine');
-        setCommunities(response.data.communities || []);
-      } else {
-        const response = await api.get<CommunitySummary[]>('/communities', {
-          params: query.trim() ? {q: query.trim()} : undefined,
-        });
-        setCommunities(response.data || []);
+  const visibleCommunities = useMemo(
+    () =>
+      communities.filter(item => {
+        const id = item.id || item._id;
+        return !blockedIds[String(id)];
+      }),
+    [blockedIds, communities],
+  );
+
+  useEffect(() => {
+    setPreviewId(null);
+  }, [mode, query]);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => undefined);
+    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', setReduceMotion);
+    return () => sub?.remove?.();
+  }, []);
+
+  const load = useCallback(
+    async ({refresh = false} = {}) => {
+      if (refresh) setRefreshing(true);
+      else if (!communities.length) setInitialLoading(true);
+      setError('');
+      try {
+        if (mode === 'mine') {
+          const response = await api.get<{communities: CommunitySummary[]}>('/communities/mine');
+          setCommunities(response.data.communities || []);
+        } else {
+          const response = await api.get<CommunitySummary[]>('/communities', {
+            params: query.trim() ? {q: query.trim()} : undefined,
+          });
+          setCommunities(response.data || []);
+        }
+      } catch (err: any) {
+        setError(
+          communityErrorCopy(
+            err,
+            mode === 'mine' ? 'Could not load your communities.' : 'Could not load communities.',
+          ),
+        );
+      } finally {
+        setInitialLoading(false);
+        setRefreshing(false);
       }
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.error ||
-          (mode === 'mine' ? 'Could not load your communities' : 'Could not load communities'),
-      );
-    } finally {
-      setInitialLoading(false);
-      setRefreshing(false);
-    }
-  }, [communities.length, mode, query]);
+    },
+    [communities.length, mode, query],
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => load(), searchOpen && mode === 'trending' ? 250 : 0);
@@ -79,12 +183,12 @@ export default function CommunityBrowseScreen() {
   useEffect(() => {
     Animated.timing(searchProgress, {
       toValue: searchOpen ? 1 : 0,
-      duration: 180,
+      duration: reduceMotion ? 0 : 180,
       useNativeDriver: false,
     }).start(() => {
       if (searchOpen) inputRef.current?.focus();
     });
-  }, [searchOpen, searchProgress]);
+  }, [searchOpen, searchProgress, reduceMotion]);
 
   const openSearch = () => {
     setMode('trending');
@@ -100,27 +204,60 @@ export default function CommunityBrowseScreen() {
     ? 'No matching communities'
     : mode === 'mine'
       ? 'No joined communities yet'
-      : 'No trending communities yet';
+      : 'No corners trending yet';
   const emptyCopy = query.trim()
-    ? 'Try a different name or description.'
+    ? 'Try a mood, topic, or different spelling — or create a quiet corner.'
     : mode === 'mine'
-      ? 'Join a community and it will show up here.'
-      : 'Create the first anonymous corner.';
+      ? 'Join a corner and it will show up here.'
+      : 'Be the first voice. Open an anonymous corner for others to find.';
+
+  const listHeader = (
+    <View>
+      {mode === 'trending' && !query.trim() ? <IntroAtmosphere reduceMotion={reduceMotion} /> : null}
+      {mode === 'trending' && !query.trim() && visibleCommunities.length > 0 ? (
+        <Text style={styles.sectionLabel} maxFontSizeMultiplier={1.3}>
+          Trending now
+        </Text>
+      ) : null}
+      {searchOpen && !query.trim() && mode === 'trending' ? (
+        <View style={styles.searchHintCard}>
+          <Feather name="search" size={16} color={pastelColors.auth.deepText} />
+          <Text style={styles.searchHintText} maxFontSizeMultiplier={1.35}>
+            Search by mood or topic — late nights, memes, help, honesty.
+          </Text>
+        </View>
+      ) : null}
+      {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View style={styles.heading}>
-          <Text style={styles.title}>Community</Text>
-          <Text style={styles.subtitle}>Find your anonymous corner</Text>
+          <Text style={styles.title} maxFontSizeMultiplier={1.3}>
+            Community
+          </Text>
+          <Text style={styles.subtitle} maxFontSizeMultiplier={1.35}>
+            Find your anonymous corner
+          </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Search communities"
-          onPress={openSearch}
-          style={styles.iconButton}>
-          <Feather name="search" size={22} color={pastelColors.auth.deepText} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Search communities"
+            onPress={openSearch}
+            style={styles.iconButton}>
+            <Feather name="search" size={22} color={pastelColors.auth.deepText} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Create community"
+            onPress={() => navigation.navigate('CommunityCreate')}
+            style={styles.createIconButton}>
+            <Feather name="plus" size={22} color={pastelColors.auth.deepText} />
+          </Pressable>
+        </View>
       </View>
 
       <Animated.View
@@ -129,7 +266,7 @@ export default function CommunityBrowseScreen() {
           {
             height: searchProgress.interpolate({inputRange: [0, 1], outputRange: [0, 48]}),
             opacity: searchProgress,
-            marginBottom: searchProgress.interpolate({inputRange: [0, 1], outputRange: [0, 12]}),
+            marginBottom: searchProgress.interpolate({inputRange: [0, 1], outputRange: [0, 10]}),
           },
         ]}
         pointerEvents={searchOpen ? 'auto' : 'none'}>
@@ -139,7 +276,7 @@ export default function CommunityBrowseScreen() {
           accessibilityLabel="Search communities"
           value={query}
           onChangeText={setQuery}
-          placeholder="Search by name or description"
+          placeholder="Search by mood or topic"
           placeholderTextColor={pastelColors.auth.mutedText}
           style={styles.input}
         />
@@ -165,7 +302,9 @@ export default function CommunityBrowseScreen() {
                 if (item === 'mine') closeSearch();
               }}
               style={[styles.tab, selected && styles.tabSelected]}>
-              <Text style={[styles.tabText, selected && styles.tabTextSelected]}>
+              <Text
+                style={[styles.tabText, selected && styles.tabTextSelected]}
+                maxFontSizeMultiplier={1.3}>
                 {item === 'trending' ? 'Trending' : 'My communities'}
               </Text>
             </Pressable>
@@ -173,79 +312,103 @@ export default function CommunityBrowseScreen() {
         })}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Create community"
-        onPress={() => navigation.navigate('CommunityCreate')}
-        style={styles.createButton}>
-        <Feather name="plus-circle" size={19} color={pastelColors.white} />
-        <Text style={styles.createText}>Create community</Text>
-      </Pressable>
-
       {initialLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={pastelColors.accent} />
-          <Text style={styles.copy}>Loading communities...</Text>
+        <View style={styles.list}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
-      ) : error && !communities.length ? (
+      ) : error && !visibleCommunities.length ? (
         <View style={styles.center}>
-          <Feather name="wifi-off" size={28} color={pastelColors.accent} />
+          <Feather name="wifi-off" size={28} color={pastelColors.auth.deepText} />
           <Text style={styles.emptyTitle}>{error}</Text>
-          <Pressable onPress={() => load()} style={styles.retry}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading communities"
+            onPress={() => load()}
+            style={styles.retry}>
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
-          data={communities}
+          data={visibleCommunities}
           keyExtractor={item => item.id || item._id}
           refreshing={refreshing}
           onRefresh={() => load({refresh: true})}
-          contentContainerStyle={communities.length ? styles.list : styles.empty}
-          ListHeaderComponent={
-            error ? <Text style={styles.inlineError}>{error}</Text> : null
-          }
-          renderItem={({item}) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${item.name}`}
-              onPress={() => navigation.navigate('CommunityHome', {community: item})}
-              style={styles.card}>
-              {item.image ? (
-                <Image source={{uri: item.image}} style={styles.image} />
-              ) : (
-                <View style={styles.imageFallback}>
-                  <Feather name="users" size={24} color={pastelColors.accent} />
+          onScrollBeginDrag={() => setPreviewId(null)}
+          contentContainerStyle={visibleCommunities.length ? styles.list : styles.empty}
+          ListHeaderComponent={listHeader}
+          renderItem={({item, index}) => {
+            const id = String(item.id || item._id);
+            const previewing = previewId === id && !reduceMotion;
+            const showRank = mode === 'trending' && !query.trim();
+            const description = item.description?.trim() || 'An anonymous place to connect.';
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${item.name}`}
+                delayLongPress={280}
+                onLongPress={() => setPreviewId(id)}
+                onPress={() => {
+                  setPreviewId(null);
+                  navigation.navigate('CommunityHome', {community: item});
+                }}
+                style={({pressed}) => [styles.card, pressed && styles.cardPressed]}>
+                {showRank ? (
+                  <View style={styles.rankSticker} pointerEvents="none">
+                    <Text style={styles.rankStickerText} maxFontSizeMultiplier={1.2}>
+                      #{index + 1}
+                    </Text>
+                  </View>
+                ) : null}
+                <CommunityAvatar name={item.name} image={item.image} />
+                <View style={styles.cardText}>
+                  <PreviewMarqueeText
+                    text={item.name}
+                    active={previewing}
+                    style={styles.name}
+                    maxFontSizeMultiplier={1.3}
+                    onManualDrag={() => setPreviewId(id)}
+                  />
+                  <PreviewMarqueeText
+                    text={description}
+                    active={previewing}
+                    style={styles.description}
+                    containerStyle={styles.descriptionClip}
+                    maxFontSizeMultiplier={1.35}
+                    onManualDrag={() => setPreviewId(id)}
+                  />
+                  <Text style={styles.statusLine} maxFontSizeMultiplier={1.3}>
+                    {browseStatusLine(item)}
+                  </Text>
                 </View>
-              )}
-              <View style={styles.cardText}>
-                <View style={styles.cardTop}>
-                  <Text numberOfLines={1} style={styles.name}>{item.name}</Text>
-                  <Text style={styles.members}>{item.membersCount || 0}</Text>
-                </View>
-                <Text numberOfLines={2} style={styles.description}>
-                  {item.description || 'An anonymous place to connect.'}
-                </Text>
-                <View style={styles.badges}>
-                  <Text style={styles.badge}>{describeVisibility(item)}</Text>
-                  <Text style={styles.badge}>{describeJoinMode(item)}</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={20} color={pastelColors.auth.mutedText} />
-            </Pressable>
-          )}
+              </Pressable>
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Feather name="users" size={28} color={pastelColors.accent} />
+              <View style={styles.emptyIcon}>
+                <Feather name="moon" size={26} color={pastelColors.auth.deepText} />
+              </View>
               <Text style={styles.emptyTitle}>{emptyTitle}</Text>
               <Text style={styles.copy}>{emptyCopy}</Text>
               {!query.trim() ? (
                 <Pressable
+                  accessibilityRole="button"
                   onPress={() => navigation.navigate('CommunityCreate')}
-                  style={styles.retry}>
-                  <Text style={styles.retryText}>Create community</Text>
+                  style={styles.softCreate}>
+                  <Feather name="plus" size={18} color={pastelColors.auth.deepText} />
+                  <Text style={styles.softCreateText}>Create a corner</Text>
                 </Pressable>
-              ) : null}
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => navigation.navigate('CommunityCreate')}
+                  style={styles.softCreate}>
+                  <Text style={styles.softCreateText}>Create instead</Text>
+                </Pressable>
+              )}
             </View>
           }
         />
@@ -259,16 +422,27 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 12,
+    paddingBottom: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  heading: {flex: 1, paddingRight: 12},
+  heading: {flex: 1, paddingRight: 8},
   title: {fontSize: 28, fontWeight: '900', color: pastelColors.auth.deepText},
   subtitle: {marginTop: 2, fontWeight: '700', color: pastelColors.auth.mutedText},
-  iconButton: {height: 48, width: 48, alignItems: 'center', justifyContent: 'center'},
-  smallIconButton: {height: 40, width: 40, alignItems: 'center', justifyContent: 'center'},
+  headerActions: {flexDirection: 'row', alignItems: 'center'},
+  iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
+  createIconButton: {
+    height: 44,
+    width: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.08)',
+  },
+  smallIconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
   search: {
     overflow: 'hidden',
     marginHorizontal: 16,
@@ -277,79 +451,223 @@ const styles = StyleSheet.create({
     backgroundColor: pastelColors.white,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.06)',
   },
   input: {flex: 1, marginLeft: 10, color: pastelColors.auth.deepText, fontWeight: '700'},
-  tabs: {flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 10},
+  tabs: {flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 4, marginTop: 4},
   tab: {
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 999,
     backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.06)',
   },
-  tabSelected: {backgroundColor: pastelColors.auth.deepText},
-  tabText: {fontWeight: '900', color: pastelColors.auth.mutedText},
+  tabSelected: {
+    backgroundColor: pastelColors.auth.deepText,
+    borderColor: pastelColors.auth.deepText,
+  },
+  tabText: {fontWeight: '800', color: pastelColors.auth.mutedText},
   tabTextSelected: {color: pastelColors.white},
-  createButton: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    minHeight: 48,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    backgroundColor: pastelColors.accent,
+  list: {paddingHorizontal: 16, paddingBottom: 24, paddingTop: 14},
+  sectionLabel: {
+    marginBottom: 10,
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: '800',
+    color: pastelColors.auth.mutedText,
+    letterSpacing: 0.2,
   },
-  createText: {color: pastelColors.white, fontSize: 15, fontWeight: '900'},
-  list: {paddingHorizontal: 16, paddingBottom: 18},
+  introCard: {
+    marginBottom: 14,
+    padding: 18,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#FFE8F0',
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.06)',
+  },
+  introBlob: {
+    position: 'absolute',
+    borderRadius: 999,
+    opacity: 0.55,
+  },
+  introBlobOne: {
+    width: 120,
+    height: 120,
+    top: -36,
+    right: -28,
+    backgroundColor: '#F7C4D4',
+  },
+  introBlobTwo: {
+    width: 90,
+    height: 90,
+    bottom: -30,
+    left: -20,
+    backgroundColor: '#D7E9F7',
+  },
+  introDotRow: {flexDirection: 'row', gap: 6, marginBottom: 10},
+  introDot: {height: 8, width: 8, borderRadius: 4},
+  introTitle: {fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
+  introCopy: {
+    marginTop: 8,
+    color: pastelColors.auth.mutedText,
+    fontWeight: '600',
+    lineHeight: 21,
+  },
+  searchHintCard: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: pastelColors.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.06)',
+  },
+  searchHintText: {
+    flex: 1,
+    color: pastelColors.auth.mutedText,
+    fontWeight: '700',
+    lineHeight: 18,
+    fontSize: 13,
+  },
   card: {
+    position: 'relative',
+    padding: 14,
+    paddingTop: 16,
+    marginBottom: 10,
+    borderRadius: 12,
+    backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.07)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#32111F',
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: {width: 0, height: 3},
+    elevation: 2,
+    overflow: 'visible',
+  },
+  cardPressed: {
+    backgroundColor: '#FFF8FA',
+    borderColor: 'rgba(50, 17, 31, 0.14)',
+    transform: [{scale: 0.992}],
+  },
+  rankSticker: {
+    position: 'absolute',
+    top: -6,
+    left: 10,
+    zIndex: 2,
+    minWidth: 34,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: pastelColors.accent,
+    borderWidth: 2,
+    borderColor: pastelColors.white,
+    shadowColor: '#32111F',
+    shadowOpacity: 0.16,
+    shadowRadius: 4,
+    shadowOffset: {width: 0, height: 2},
+    elevation: 3,
+    transform: [{rotate: '-8deg'}],
+  },
+  rankStickerText: {
+    color: pastelColors.white,
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  avatar: {height: 58, width: 58, borderRadius: 16, marginRight: 12},
+  avatarFallback: {alignItems: 'center', justifyContent: 'center'},
+  avatarInitial: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: pastelColors.auth.deepText,
+  },
+  cardText: {flex: 1, minWidth: 0},
+  name: {fontSize: 16, fontWeight: '900', color: pastelColors.auth.deepText},
+  description: {
+    color: pastelColors.auth.mutedText,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  descriptionClip: {marginTop: 4},
+  statusLine: {
+    marginTop: 7,
+    color: pastelColors.auth.deepText,
+    fontWeight: '700',
+    fontSize: 12,
+    opacity: 0.78,
+  },
+  skeletonCard: {
+    flexDirection: 'row',
     padding: 14,
     marginBottom: 10,
-    borderRadius: 18,
-    backgroundColor: pastelColors.auth.glassSurface,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  image: {height: 56, width: 56, borderRadius: 16, marginRight: 12},
-  imageFallback: {
-    height: 56,
-    width: 56,
-    borderRadius: 16,
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: pastelColors.auth.primaryOverlay,
-  },
-  cardText: {flex: 1},
-  cardTop: {flexDirection: 'row', alignItems: 'center', gap: 8},
-  name: {flex: 1, fontSize: 16, fontWeight: '900', color: pastelColors.auth.deepText},
-  description: {marginTop: 3, color: pastelColors.auth.mutedText, fontWeight: '600', lineHeight: 18},
-  members: {color: pastelColors.accent, fontWeight: '900', fontSize: 12},
-  badges: {marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 6},
-  badge: {
-    overflow: 'hidden',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 12,
     backgroundColor: pastelColors.white,
-    color: pastelColors.auth.mutedText,
-    fontSize: 11,
-    fontWeight: '800',
+  },
+  skeletonAvatar: {
+    height: 58,
+    width: 58,
+    borderRadius: 16,
+    backgroundColor: '#F0EAEB',
+    marginRight: 12,
+  },
+  skeletonBody: {flex: 1, justifyContent: 'center'},
+  skeletonLine: {
+    height: 12,
+    borderRadius: 8,
+    backgroundColor: '#F0EAEB',
   },
   center: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24},
-  empty: {flexGrow: 1, paddingHorizontal: 16},
-  copy: {marginTop: 10, color: pastelColors.auth.mutedText, fontWeight: '700', textAlign: 'center'},
+  empty: {flexGrow: 1, paddingHorizontal: 16, paddingTop: 8},
+  emptyIcon: {
+    height: 56,
+    width: 56,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.06)',
+  },
+  copy: {
+    marginTop: 10,
+    color: pastelColors.auth.mutedText,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   emptyTitle: {
-    marginTop: 12,
+    marginTop: 14,
     color: pastelColors.auth.deepText,
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
   },
+  softCreate: {
+    marginTop: 18,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: pastelColors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(50, 17, 31, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  softCreateText: {color: pastelColors.auth.deepText, fontWeight: '900'},
   inlineError: {
     marginBottom: 10,
     padding: 12,
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: pastelColors.white,
     color: pastelColors.auth.deepText,
     fontWeight: '800',
@@ -357,10 +675,12 @@ const styles = StyleSheet.create({
   },
   retry: {
     marginTop: 16,
+    minHeight: 44,
     paddingHorizontal: 22,
     paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: pastelColors.accent,
+    borderRadius: 12,
+    backgroundColor: pastelColors.auth.deepText,
+    justifyContent: 'center',
   },
-  retryText: {color: pastelColors.white, fontWeight: '900'},
+  retryText: {color: pastelColors.white, fontWeight: '900', textAlign: 'center'},
 });

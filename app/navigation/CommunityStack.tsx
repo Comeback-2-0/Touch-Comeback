@@ -19,15 +19,21 @@ export type CommunitySummary = {
   membersCount: number;
   contentVisibility?: 'public' | 'members';
   joinMode?: 'open' | 'approval' | 'invite-only';
+  trendingScore?: number;
+  trendingReason?: string;
+  createdAt?: string;
+  rules?: string;
+  queueMode?: 'manual' | 'scheduled' | string;
+  queueAutoDeleteDays?: number;
 };
 
 export type CommunityStackParamList = {
   CommunityBrowse: undefined;
-  CommunityHome: { community: CommunitySummary };
+  CommunityHome: { community?: CommunitySummary; communityId?: string };
   CommunityCompose: { community: CommunitySummary };
   CommunityQueue: { community: CommunitySummary };
   CommunityCreate: undefined;
-  CommunityPost: {community: CommunitySummary; contentId: string};
+  CommunityPost: {community?: CommunitySummary; communityId?: string; contentId: string};
   CommunityManage: {community: CommunitySummary};
   CommunityInvite: {community: CommunitySummary};
 };

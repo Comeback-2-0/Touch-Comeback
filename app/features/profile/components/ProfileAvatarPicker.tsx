@@ -1,6 +1,7 @@
 import React from 'react';
 import {ActivityIndicator, Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Feather from 'react-native-vector-icons/Feather';
 import {pastelColors} from '../../../theme/colors';
 import type {LocalProfileImage} from '../types';
 
@@ -8,6 +9,7 @@ type Props = {
   image: LocalProfileImage | null;
   fallbackUri?: string;
   onPick: () => void;
+  onAdjust?: () => void;
   uploading?: boolean;
   progress?: number;
 };
@@ -16,10 +18,12 @@ export default function ProfileAvatarPicker({
   image,
   fallbackUri,
   onPick,
+  onAdjust,
   uploading = false,
   progress = 0,
 }: Props) {
   const uri = image?.uri || fallbackUri;
+  const canAdjust = Boolean(image?.uri && onAdjust);
 
   return (
     <View style={styles.wrapper}>
@@ -41,6 +45,17 @@ export default function ProfileAvatarPicker({
         </View>
       </Pressable>
       <Text style={styles.label}>Profile Picture</Text>
+      {canAdjust ? (
+        <Pressable
+          testID="profile-avatar-adjust"
+          accessibilityRole="button"
+          accessibilityLabel="Adjust profile picture"
+          onPress={onAdjust}
+          style={styles.adjustButton}>
+          <Feather name="crop" size={14} color={pastelColors.accent} />
+          <Text style={styles.adjustLabel}>Adjust</Text>
+        </Pressable>
+      ) : null}
       {uploading ? (
         <View style={styles.progressRow}>
           <ActivityIndicator size="small" color={pastelColors.accent} />
@@ -91,6 +106,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: pastelColors.auth.deepText,
+  },
+  adjustButton: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  adjustLabel: {
+    color: pastelColors.accent,
+    fontWeight: '800',
+    fontSize: 13,
   },
   progressRow: {
     flexDirection: 'row',

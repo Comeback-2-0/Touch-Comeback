@@ -21,6 +21,10 @@ jest.mock('../app/features/posts/api/postsApi', () => ({
   withdrawPostReport: jest.fn(),
 }));
 
+jest.mock('../app/utils/api', () => ({
+  commentOnPost: jest.fn(),
+}));
+
 jest.mock('react-native-vector-icons/Ionicons', () => {
   const {Text} = require('react-native');
   return ({name, ...props}: {name: string}) => <Text {...props}>{name}</Text>;
@@ -371,5 +375,17 @@ describe('PublicPostCard likes', () => {
       'Could not send report. Please try again.',
       ToastAndroid.SHORT,
     );
+  });
+
+  it('opens comments from the comment action', () => {
+    act(() => {
+      screen = renderer.create(<PublicPostCard post={makePost()} />);
+    });
+
+    act(() => {
+      screen!.root.findByProps({testID: 'post-comment-action'}).props.onPress();
+    });
+
+    expect(screen!.root.findByProps({testID: 'post-comments-sheet'})).toBeTruthy();
   });
 });

@@ -2,7 +2,6 @@ import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +27,7 @@ type Props = {
   onSwitchAccount?: () => Promise<void> | void;
   image: LocalProfileImage | null;
   onPickImage: () => void;
+  onAdjustImage?: () => void;
   onSubmit: (payload: ProfilePayload, image: LocalProfileImage | null) => Promise<void>;
   submitting: boolean;
   uploading?: boolean;
@@ -44,6 +44,7 @@ export default function ProfileForm({
   onSwitchAccount,
   image,
   onPickImage,
+  onAdjustImage,
   onSubmit,
   submitting,
   uploading = false,
@@ -86,9 +87,10 @@ export default function ProfileForm({
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior="padding">
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}>
           <Text style={styles.title}>{title}</Text>
@@ -99,6 +101,7 @@ export default function ProfileForm({
               image={image}
               fallbackUri={initialProfile?.profilePicture}
               onPick={onPickImage}
+              onAdjust={onAdjustImage}
               uploading={uploading}
               progress={uploadProgress}
             />

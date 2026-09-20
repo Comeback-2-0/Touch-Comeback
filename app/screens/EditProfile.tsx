@@ -86,6 +86,7 @@ export default function EditProfile() {
         initialProfile={profile}
         image={imagePicker.image}
         onPickImage={imagePicker.pickImage}
+        onAdjustImage={imagePicker.adjustImage}
         onSubmit={handleSubmit}
         submitting={updateMutation.isPending}
         uploading={uploadMutation.isPending}
