@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Check out repository
@@ -61,3 +61,20 @@ jobs:
           name: android-release-aab
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
+
+      - name: Publish latest Android release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          if gh release view latest; then
+            gh release upload latest "$apk" "$aab" --clobber
+            gh release edit latest --target "$GITHUB_SHA"
+          else
+            gh release create latest "$apk" "$aab" \
+              --target "$GITHUB_SHA" \
+              --title "Latest Android build" \
+              --notes "Automated Android build from $GITHUB_SHA" \
+              --prerelease
+          fi
