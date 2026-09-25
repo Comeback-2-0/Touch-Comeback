@@ -41,7 +41,9 @@ jobs:
           TOUCH_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           TOUCH_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           TOUCH_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease bundleRelease
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease bundleRelease
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
