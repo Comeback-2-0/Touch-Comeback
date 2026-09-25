@@ -48,6 +48,13 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleRelease bundleRelease
 
+      - name: Name release APK
+        run: |
+          version_name=$(sed -nE 's/^[[:space:]]*versionName "([^"]+)".*/\1/p' android/app/build.gradle)
+          test -n "$version_name"
+          mv android/app/build/outputs/apk/release/app-release.apk \
+            "android/app/build/outputs/apk/release/touch_v${version_name}.apk"
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
@@ -66,13 +73,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          apk=android/app/build/outputs/apk/release/app-release.apk
-          aab=android/app/build/outputs/bundle/release/app-release.aab
+          apk=$(find android/app/build/outputs/apk/release -name 'touch_v*.apk' -print -quit)
           if gh release view latest; then
-            gh release upload latest "$apk" "$aab" --clobber
+            gh release view latest --json assets --jq '.assets[].name' | while read -r asset; do
+              gh release delete-asset latest "$asset" --yes
+            done
+            gh release upload latest "$apk"
             gh release edit latest --target "$GITHUB_SHA"
           else
-            gh release create latest "$apk" "$aab" \
+            gh release create latest "$apk" \
               --target "$GITHUB_SHA" \
               --title "Latest Android build" \
               --notes "Automated Android build from $GITHUB_SHA" \
