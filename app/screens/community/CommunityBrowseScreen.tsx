@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -113,6 +113,7 @@ function IntroAtmosphere({reduceMotion}: {reduceMotion: boolean}) {
 
 export default function CommunityBrowseScreen() {
   const navigation = useNavigation<Navigation>();
+  const insets = useSafeAreaInsets();
   const [communities, setCommunities] = useState<CommunitySummary[]>([]);
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<BrowseMode>('trending');
@@ -249,13 +250,6 @@ export default function CommunityBrowseScreen() {
             onPress={openSearch}
             style={styles.iconButton}>
             <Feather name="search" size={22} color={pastelColors.auth.deepText} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Create community"
-            onPress={() => navigation.navigate('CommunityCreate')}
-            style={styles.createIconButton}>
-            <Feather name="plus" size={22} color={pastelColors.auth.deepText} />
           </Pressable>
         </View>
       </View>
@@ -413,6 +407,17 @@ export default function CommunityBrowseScreen() {
           }
         />
       )}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Create community"
+        onPress={() => navigation.navigate('CommunityCreate')}
+        style={({pressed}) => [
+          styles.createFab,
+          {bottom: insets.bottom + 76},
+          pressed && styles.createFabPressed,
+        ]}>
+        <Feather name="plus" size={26} color={pastelColors.white} />
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -432,15 +437,24 @@ const styles = StyleSheet.create({
   subtitle: {marginTop: 2, fontWeight: '700', color: pastelColors.auth.mutedText},
   headerActions: {flexDirection: 'row', alignItems: 'center'},
   iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
-  createIconButton: {
-    height: 44,
-    width: 44,
-    borderRadius: 14,
+  createFab: {
+    position: 'absolute',
+    right: 18,
+    height: 58,
+    width: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: pastelColors.white,
-    borderWidth: 1,
-    borderColor: 'rgba(50, 17, 31, 0.08)',
+    backgroundColor: pastelColors.accent,
+    shadowColor: '#32111F',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: {width: 0, height: 4},
+    elevation: 6,
+  },
+  createFabPressed: {
+    transform: [{scale: 0.94}],
+    opacity: 0.9,
   },
   smallIconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
   search: {
