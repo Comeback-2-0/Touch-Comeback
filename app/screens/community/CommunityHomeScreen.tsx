@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -24,7 +25,6 @@ import CommunityConfirmSheet from './CommunityConfirmSheet';
 import {useBlockedCommunitiesStore} from './blockedCommunitiesStore';
 import {
   communityErrorCopy,
-  countThreadComments,
   joinModeLabel,
   leaveConsequenceCopy,
   membersCopy,
@@ -574,16 +574,15 @@ export default function CommunityHomeScreen() {
                 <MaterialCommunityIcons name={item.dislikedByMe ? 'thumb-down' : 'thumb-down-outline'} size={19} color={item.dislikedByMe ? pastelColors.accent : pastelColors.auth.deepText} />
                 <Text style={styles.feedActionText}>{Number(item.dislikes || 0)}</Text>
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open comments"
-                onPress={() => navigation.navigate('CommunityPost', {community, contentId: item.id, focusComment: true})}
-                style={styles.feedAction}>
-                <Feather name="message-circle" size={20} color={pastelColors.auth.deepText} />
-                <Text style={styles.feedActionText}>
-                  {Number(item.commentsCount ?? countThreadComments(item.comments as any))}
-                </Text>
-              </Pressable>
+              <TextInput
+                accessibilityLabel="Write a comment"
+                editable={false}
+                placeholder="Write a comment..."
+                placeholderTextColor={pastelColors.auth.mutedText}
+                onFocus={() => navigation.navigate('CommunityPost', {community, contentId: item.id, focusComment: true})}
+                onPressIn={() => navigation.navigate('CommunityPost', {community, contentId: item.id, focusComment: true})}
+                style={styles.commentInput}
+              />
             </View>
           </Pressable>
         )}
@@ -900,6 +899,16 @@ const styles = StyleSheet.create({
   },
   feedAction: {flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 38},
   feedActionText: {fontWeight: '900', color: pastelColors.auth.deepText, fontSize: 13},
+  commentInput: {
+    flex: 1,
+    minHeight: 36,
+    marginLeft: 8,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: pastelColors.auth.background,
+    color: pastelColors.auth.deepText,
+    fontSize: 12,
+  },
   feedMeta: {color: pastelColors.auth.mutedText, fontWeight: '700', fontSize: 12},
   meta: {
     paddingHorizontal: 14,
