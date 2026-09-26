@@ -1,4 +1,4 @@
-import React, {useRef} from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   Animated,
   Image,
@@ -34,6 +34,7 @@ type Props = {
   showAvatar?: boolean;
   showAnonymousLabel?: boolean;
   onDoubleTapLike?: () => void;
+  onSingleTap?: () => void;
   onMorePress?: () => void;
 };
 
@@ -57,12 +58,17 @@ export default function CommunityPostCard({
   showAvatar = !queueStyle,
   showAnonymousLabel = !queueStyle,
   onDoubleTapLike,
+  onSingleTap,
   onMorePress,
 }: Props) {
   const uri = media?.url || media?.uri;
   const hasMedia = Boolean(uri);
   const hasText = Boolean(caption.trim());
   const lastTap = useRef(0);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+  }, []);
   const heart = useRef(new Animated.Value(0)).current;
 
   const burstHeart = () => {
@@ -79,11 +85,18 @@ export default function CommunityPostCard({
     const now = Date.now();
     if (now - lastTap.current < 280) {
       lastTap.current = 0;
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
       burstHeart();
       onDoubleTapLike();
       return;
     }
     lastTap.current = now;
+    if (onSingleTap) {
+      singleTapTimer.current = setTimeout(() => {
+        singleTapTimer.current = null;
+        onSingleTap();
+      }, 280);
+    }
   };
 
   if (!hasMedia && !hasText) return null;
@@ -215,7 +228,7 @@ const styles = StyleSheet.create({
   alias: {fontWeight: '900', color: pastelColors.accent},
   meta: {
     marginTop: 1,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: pastelColors.auth.mutedText,
   },

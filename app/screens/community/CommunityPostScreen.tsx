@@ -297,6 +297,12 @@ export default function CommunityPostScreen() {
   const insertOpacity = useRef(new Animated.Value(1)).current;
   const keyboardHeight = useKeyboardHeight();
 
+  useEffect(() => {
+    if (!params.focusComment || loading || !post) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 180);
+    return () => clearTimeout(timer);
+  }, [loading, params.focusComment, post]);
+
   const load = useCallback(async () => {
     if (!communityId || !contentId) {
       setError('This post is unavailable.');

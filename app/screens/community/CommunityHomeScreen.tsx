@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {RouteProp, useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {api} from '../../utils/api';
@@ -112,6 +113,7 @@ export default function CommunityHomeScreen() {
   const [error, setError] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [postMenuId, setPostMenuId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [muted, setMuted] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
@@ -546,7 +548,7 @@ export default function CommunityHomeScreen() {
         }
         renderItem={({item}) => (
           <Pressable
-            onPress={() => navigation.navigate('CommunityPost', {community, contentId: item.id})}
+              onPress={() => navigation.navigate('CommunityPost', {community, contentId: item.id})}
             style={styles.card}>
             <CommunityPostCard
               compact
@@ -557,27 +559,31 @@ export default function CommunityHomeScreen() {
               timeLabel={item.createdAt ? formatRelativeTime(item.createdAt) : undefined}
               showAvatar={false}
               showAnonymousLabel={false}
-              onDoubleTapLike={() => engagePost(item.id, 'like')}
-              onMorePress={() => Alert.alert('Post options', 'What would you like to do?', [
-                {text: 'Cancel', style: 'cancel'},
-                {text: 'Report post', style: 'destructive', onPress: () => api.post(`/communities/${id}/content/${item.id}/report`, {reason: 'other'})},
-              ])}
+              onDoubleTapLike={() => {
+                if (!item.likedByMe) engagePost(item.id, 'like');
+              }}
+              onSingleTap={() => navigation.navigate('CommunityPost', {community, contentId: item.id})}
+              onMorePress={() => setPostMenuId(item.id)}
             />
             <View style={styles.feedActions}>
                 <Pressable accessibilityRole="button" accessibilityLabel="Like post" onPress={() => engagePost(item.id, 'like')} style={styles.feedAction}>
-                <Feather name="thumbs-up" size={17} color={item.likedByMe ? pastelColors.accent : pastelColors.auth.deepText} />
+                <MaterialCommunityIcons name={item.likedByMe ? 'thumb-up' : 'thumb-up-outline'} size={19} color={item.likedByMe ? pastelColors.accent : pastelColors.auth.deepText} />
                 <Text style={styles.feedActionText}>{Number(item.likes || 0)}</Text>
                 </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel="Dislike post" onPress={() => engagePost(item.id, 'dislike')} style={styles.feedAction}>
-                <Feather name="thumbs-down" size={17} color={item.dislikedByMe ? pastelColors.accent : pastelColors.auth.deepText} />
+                <MaterialCommunityIcons name={item.dislikedByMe ? 'thumb-down' : 'thumb-down-outline'} size={19} color={item.dislikedByMe ? pastelColors.accent : pastelColors.auth.deepText} />
                 <Text style={styles.feedActionText}>{Number(item.dislikes || 0)}</Text>
               </Pressable>
-              <View style={styles.feedAction}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open comments"
+                onPress={() => navigation.navigate('CommunityPost', {community, contentId: item.id, focusComment: true})}
+                style={styles.feedAction}>
                 <Feather name="message-circle" size={20} color={pastelColors.auth.deepText} />
                 <Text style={styles.feedActionText}>
                   {Number(item.commentsCount ?? countThreadComments(item.comments as any))}
                 </Text>
-              </View>
+              </Pressable>
             </View>
           </Pressable>
         )}
@@ -605,6 +611,25 @@ export default function CommunityHomeScreen() {
         onClose={() => setSheetOpen(false)}
         onSubmit={sendRequest}
       />
+
+      <Modal visible={Boolean(postMenuId)} transparent animationType="fade" onRequestClose={() => setPostMenuId(null)}>
+        <Pressable style={styles.postMenuOverlay} onPress={() => setPostMenuId(null)}>
+          <View style={styles.postMenu}>
+            <Text style={styles.optionsTitle}>Post options</Text>
+            <Pressable style={styles.optionsRow} onPress={() => {
+              const reportId = postMenuId;
+              setPostMenuId(null);
+              if (reportId) api.post(`/communities/${id}/content/${reportId}/report`, {reason: 'other'}).catch(() => undefined);
+            }}>
+              <Feather name="flag" size={18} color={pastelColors.auth.deepText} />
+              <Text style={styles.optionsRowText}>Report post</Text>
+            </Pressable>
+            <Pressable style={styles.optionsCancel} onPress={() => setPostMenuId(null)}>
+              <Text style={styles.optionsCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       <Modal visible={optionsOpen} transparent animationType="slide" onRequestClose={() => setOptionsOpen(false)}>
         <View style={styles.optionsOverlay}>
@@ -858,8 +883,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   card: {
-    marginBottom: 10,
-    borderRadius: 18,
+    marginBottom: 6,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: pastelColors.white,
     borderWidth: 1,
@@ -867,12 +892,13 @@ const styles = StyleSheet.create({
   },
   feedActions: {
     paddingHorizontal: 14,
-    paddingBottom: 12,
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: 24,
   },
-  feedAction: {flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44},
+  feedAction: {flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 38},
   feedActionText: {fontWeight: '900', color: pastelColors.auth.deepText, fontSize: 13},
   feedMeta: {color: pastelColors.auth.mutedText, fontWeight: '700', fontSize: 12},
   meta: {
@@ -901,6 +927,8 @@ const styles = StyleSheet.create({
     backgroundColor: pastelColors.white,
   },
   optionsOverlay: {flex: 1, justifyContent: 'flex-end'},
+  postMenuOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.18)'},
+  postMenu: {padding: 18, borderTopLeftRadius: 18, borderTopRightRadius: 18, backgroundColor: pastelColors.white},
   optionsBackdrop: {...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(50, 17, 31, 0.28)'},
   optionsSheet: {
     padding: 20,
