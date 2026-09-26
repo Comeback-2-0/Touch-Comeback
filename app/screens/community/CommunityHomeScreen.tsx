@@ -4,6 +4,7 @@ import {
   FlatList,
   Image,
   Modal,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -72,7 +73,7 @@ function ScreenHeader({title, onBack}: {title: string; onBack: () => void}) {
       <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} style={styles.iconButton}>
         <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
       </Pressable>
-      <Text numberOfLines={1} style={[styles.head, {flex: 1}]}>
+      <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.head, {flex: 1}]}>
         {title}
       </Text>
       <View style={styles.iconButton} />
@@ -123,6 +124,15 @@ export default function CommunityHomeScreen() {
   const listRef = useRef<FlatList<Post>>(null);
   const stickToLatestRef = useRef(true);
   const loadingOlderRef = useRef(false);
+  const noticePan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderRelease: (_, gesture) => {
+        if (Math.abs(gesture.dx) > 40) setNoticeOpen(false);
+      },
+    }),
+  ).current;
 
   const joined = membership?.status === 'active';
   const manager = ['owner', 'moderator'].includes(membership?.role);
@@ -492,8 +502,8 @@ export default function CommunityHomeScreen() {
           <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
         </Pressable>
         <Pressable onPress={showCommunityInfo} onLongPress={showCommunityInfo} style={styles.headButton}>
-          <Text numberOfLines={1} style={[styles.head, {flex: 1}]}>
-          {community.name}
+          <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.head, {flex: 1}]}>
+            {community.name}
           </Text>
         </Pressable>
         <View style={styles.actions}>
@@ -515,12 +525,17 @@ export default function CommunityHomeScreen() {
       </View>
 
       {noticeOpen && notices.length ? (
-        <Pressable style={styles.noticeBar} onPress={notices[noticeIndex]?.onPress}>
-          <Feather name="shield" size={16} color={pastelColors.accent} />
-          <Text style={styles.noticeText}>{notices[noticeIndex]?.text}</Text>
-          <Pressable onPress={() => setNoticeOpen(false)} accessibilityLabel="Close information" style={styles.noticeClose}>
-            <Feather name="x" size={16} color={pastelColors.auth.mutedText} />
-          </Pressable>
+        <Pressable
+          {...noticePan.panHandlers}
+          style={styles.noticeBar}
+          onPress={notices[noticeIndex]?.onPress}
+          onLongPress={() => setNoticeOpen(false)}
+          delayLongPress={450}
+          accessibilityLabel="Community information"
+          accessibilityHint="Swipe horizontally or long press to dismiss">
+          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.noticeText}>
+            {notices[noticeIndex]?.text}
+          </Text>
         </Pressable>
       ) : null}
 
@@ -702,16 +717,16 @@ const styles = StyleSheet.create({
   noticeBar: {
     marginHorizontal: 16,
     marginBottom: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     minHeight: 48,
     borderRadius: 14,
-    backgroundColor: pastelColors.auth.glassSurface,
+    backgroundColor: '#FFF0D9',
+    borderWidth: 1,
+    borderColor: '#F6D7A8',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  noticeText: {flex: 1, color: pastelColors.auth.mutedText, fontWeight: '700', lineHeight: 18},
-  noticeClose: {height: 36, width: 30, alignItems: 'center', justifyContent: 'center'},
+  noticeText: {flex: 1, color: pastelColors.auth.deepText, fontWeight: '800', lineHeight: 18},
   headerAction: {
     position: 'relative',
     minHeight: 44,

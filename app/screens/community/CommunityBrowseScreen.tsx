@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -114,7 +114,6 @@ function IntroAtmosphere({reduceMotion}: {reduceMotion: boolean}) {
 
 export default function CommunityBrowseScreen() {
   const navigation = useNavigation<Navigation>();
-  const insets = useSafeAreaInsets();
   const [communities, setCommunities] = useState<CommunitySummary[]>([]);
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<BrowseMode>('trending');
@@ -420,7 +419,7 @@ export default function CommunityBrowseScreen() {
         onPress={() => navigation.navigate('CommunityCreate')}
         style={({pressed}) => [
           styles.createFab,
-          {bottom: insets.bottom + 76},
+          {bottom: 16},
           pressed && styles.createFabPressed,
         ]}>
         <Feather name="plus" size={26} color={pastelColors.white} />
