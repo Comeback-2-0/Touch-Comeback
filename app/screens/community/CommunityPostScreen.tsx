@@ -33,7 +33,6 @@ import {
   MAX_ALIAS_LENGTH,
   MAX_COMMENT_TEXT,
   REPORT_CATEGORIES,
-  aliasColor,
   aliasConflictOnPost,
   communityErrorCopy,
   countThreadComments,
@@ -129,28 +128,15 @@ function patchEngagement(target: Engagement, action: 'like' | 'dislike'): Engage
   };
 }
 
-function AliasChip({alias, time, mine}: {alias: string; time?: string; mine?: boolean}) {
+function AliasChip({alias, time, mine: _mine}: {alias: string; time?: string; mine?: boolean}) {
   return (
     <View style={styles.aliasChip}>
-      <View style={[styles.miniAvatar, {backgroundColor: aliasColor(alias)}]}>
-        <Text style={styles.miniAvatarText} maxFontSizeMultiplier={1.35}>
-          {alias.trim().charAt(0).toUpperCase() || '?'}
-        </Text>
-      </View>
       <View style={{flex: 1}}>
         <View style={styles.aliasRow}>
           <Text style={styles.alias} maxFontSizeMultiplier={1.35}>
             {alias}
           </Text>
-          {mine ? (
-            <View style={styles.youChip}>
-              <Text style={styles.youChipText}>You</Text>
-            </View>
-          ) : null}
         </View>
-        <Text style={styles.anonLabel} maxFontSizeMultiplier={1.35}>
-          anonymous
-        </Text>
       </View>
       {time ? (
         <Text style={styles.timeLabel} maxFontSizeMultiplier={1.3}>
@@ -168,6 +154,7 @@ function VoteButton({
   label,
   onPress,
   reduceMotion,
+  compact = false,
 }: {
   icon: string;
   count: number;
@@ -175,6 +162,7 @@ function VoteButton({
   label: string;
   onPress: () => void;
   reduceMotion: boolean;
+  compact?: boolean;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
@@ -191,19 +179,19 @@ function VoteButton({
         }
         onPress();
       }}
-      style={styles.voteButton}>
+      style={[styles.voteButton, compact && styles.voteButtonCompact]}>
       <Animated.View style={{transform: [{scale}]}}>
         {icon === 'thumbs-up' || icon === 'thumbs-down' ? (
           <MaterialCommunityIcons
             name={active ? icon === 'thumbs-up' ? 'thumb-up' : 'thumb-down' : icon === 'thumbs-up' ? 'thumb-up-outline' : 'thumb-down-outline'}
-            size={24}
+          size={compact ? 19 : 24}
             color={active ? pastelColors.accent : pastelColors.auth.mutedText}
           />
         ) : (
-          <Feather name={icon} size={24} color={active ? pastelColors.accent : pastelColors.auth.mutedText} />
+          <Feather name={icon} size={compact ? 19 : 24} color={active ? pastelColors.accent : pastelColors.auth.mutedText} />
         )}
       </Animated.View>
-      <Text style={[styles.voteCount, active && styles.voteCountActive]}>{count}</Text>
+      <Text style={[styles.voteCount, compact && styles.voteCountCompact, active && styles.voteCountActive]}>{count}</Text>
     </Pressable>
   );
 }
@@ -673,6 +661,7 @@ export default function CommunityPostScreen() {
                       count={item.likes || 0}
                       active={item.likedByMe}
                       label="Like comment"
+                      compact
                       reduceMotion={reduceMotion}
                       onPress={() => engage(item, 'like', `${base}/comments/${item.id}/like`)}
                     />
@@ -681,6 +670,7 @@ export default function CommunityPostScreen() {
                       count={item.dislikes || 0}
                       active={item.dislikedByMe}
                       label="Dislike comment"
+                      compact
                       reduceMotion={reduceMotion}
                       onPress={() => engage(item, 'dislike', `${base}/comments/${item.id}/dislike`)}
                     />
@@ -718,7 +708,8 @@ export default function CommunityPostScreen() {
                           icon="thumbs-up"
                           count={reply.likes || 0}
                           active={reply.likedByMe}
-                          label="Like reply"
+                        label="Like reply"
+                        compact
                           reduceMotion={reduceMotion}
                           onPress={() =>
                             engage(
@@ -733,6 +724,7 @@ export default function CommunityPostScreen() {
                           count={reply.dislikes || 0}
                           active={reply.dislikedByMe}
                           label="Dislike reply"
+                          compact
                           reduceMotion={reduceMotion}
                           onPress={() =>
                             engage(
@@ -1135,6 +1127,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   voteCount: {fontWeight: '800', color: pastelColors.auth.mutedText, fontSize: 12},
+  voteButtonCompact: {minHeight: 34, minWidth: 34, paddingHorizontal: 3, gap: 3},
+  voteCountCompact: {fontSize: 11},
   voteCountActive: {color: pastelColors.accent},
   replyAction: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
   moreAction: {
