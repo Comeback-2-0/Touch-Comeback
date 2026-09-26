@@ -70,9 +70,7 @@ type Comment = Engagement & {
 
 const reactionOptions = [
   {value: 'like', label: 'Like', icon: 'thumbs-up'},
-  {value: 'love', label: 'Love', icon: 'heart'},
-  {value: 'laugh', label: 'Funny', icon: 'smile'},
-  {value: 'support', label: 'Support', icon: 'award'},
+  {value: 'dislike', label: 'Dislike', icon: 'thumbs-down'},
 ] as const;
 
 function mergeThread(previous: any, incoming: any) {
@@ -521,7 +519,6 @@ export default function CommunityPostScreen() {
             <Text style={styles.heading} numberOfLines={1} maxFontSizeMultiplier={1.35}>
               {community?.name || 'Community'}
             </Text>
-            <Text style={styles.headingMeta}>Post</Text>
           </View>
           <View style={styles.iconButton} />
         </View>
@@ -545,7 +542,6 @@ export default function CommunityPostScreen() {
             <Text style={styles.heading} numberOfLines={1}>
               {community?.name || 'Community'}
             </Text>
-            <Text style={styles.headingMeta}>Post</Text>
           </View>
           <View style={styles.iconButton} />
         </View>
@@ -574,7 +570,6 @@ export default function CommunityPostScreen() {
           <Text style={styles.heading} numberOfLines={1} maxFontSizeMultiplier={1.35}>
             {community?.name || 'Community'}
           </Text>
-          <Text style={styles.headingMeta}>Post</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -599,8 +594,10 @@ export default function CommunityPostScreen() {
             caption={post.text}
             media={post.media}
             link={post.link}
-            state={post.pinned ? 'Pinned' : post.state === 'removed' ? 'Removed' : 'Published'}
+            state={post.pinned ? 'Pinned' : post.state === 'removed' ? 'Removed' : undefined}
             timeLabel={formatRelativeTime(post.createdAt)}
+            showAvatar={false}
+            showAnonymousLabel={false}
             onPressLink={post.link ? () => openLink(post.link) : undefined}
           />
 
@@ -971,7 +968,7 @@ const styles = StyleSheet.create({
   safe: {flex: 1, backgroundColor: pastelColors.auth.background},
   flex: {flex: 1},
   header: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
     paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -981,7 +978,7 @@ const styles = StyleSheet.create({
   heading: {fontWeight: '900', fontSize: 17, color: pastelColors.auth.deepText},
   headingMeta: {marginTop: 1, fontSize: 12, fontWeight: '800', color: pastelColors.auth.mutedText},
   iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
-  content: {padding: 16, paddingBottom: 24},
+  content: {paddingHorizontal: 12, paddingTop: 4, paddingBottom: 18},
   center: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24},
   errorTitle: {
     marginTop: 12,
@@ -1018,7 +1015,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 14,
-    marginTop: 8,
+    marginTop: 4,
     minHeight: 44,
     justifyContent: 'center',
     backgroundColor: pastelColors.white,
@@ -1073,11 +1070,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 4,
     flexDirection: 'row',
-    gap: 6,
+    gap: 14,
     alignItems: 'center',
   },
   commentsHead: {
-    marginTop: 20,
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1100,9 +1097,9 @@ const styles = StyleSheet.create({
   sortText: {fontWeight: '800', color: pastelColors.auth.deepText, fontSize: 12},
   sortTextActive: {color: pastelColors.white},
   emptyComments: {
-    marginTop: 16,
-    padding: 18,
-    borderRadius: 16,
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 10,
     backgroundColor: pastelColors.white,
     alignItems: 'center',
     gap: 6,
@@ -1110,9 +1107,9 @@ const styles = StyleSheet.create({
   emptyTitle: {fontWeight: '900', color: pastelColors.auth.deepText, textAlign: 'center'},
   emptyCopy: {color: pastelColors.auth.mutedText, fontWeight: '700', textAlign: 'center'},
   comment: {
-    marginTop: 12,
+    marginTop: 8,
     padding: 14,
-    borderRadius: 16,
+    borderRadius: 10,
     backgroundColor: pastelColors.white,
   },
   commentText: {marginTop: 8, color: pastelColors.auth.deepText, lineHeight: 20},
