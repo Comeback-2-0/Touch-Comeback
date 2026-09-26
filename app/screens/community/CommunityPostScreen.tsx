@@ -368,7 +368,13 @@ export default function CommunityPostScreen() {
       };
     });
     try {
-      const response = await api.post(`${base}/${value}`);
+      let response;
+      try {
+        response = await api.post(`${base}/${value}`);
+      } catch (requestError: any) {
+        if (requestError?.response?.status !== 400) throw requestError;
+        response = await api.post(`${base}/react`, {value});
+      }
       if (response.data.post) applyPost(response.data.post);
     } catch (err) {
       await load();
