@@ -4,7 +4,6 @@ import {
   FlatList,
   Image,
   Modal,
-  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -118,41 +117,19 @@ export default function CommunityHomeScreen() {
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
-  const [noticeOpen, setNoticeOpen] = useState(true);
-  const [noticeIndex, setNoticeIndex] = useState(0);
   const blockCommunity = useBlockedCommunitiesStore(state => state.block);
   const listRef = useRef<FlatList<Post>>(null);
   const stickToLatestRef = useRef(true);
   const loadingOlderRef = useRef(false);
-  const noticePan = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) =>
-        Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
-      onPanResponderRelease: (_, gesture) => {
-        if (Math.abs(gesture.dx) > 40) setNoticeOpen(false);
-      },
-    }),
-  ).current;
 
   const joined = membership?.status === 'active';
   const manager = ['owner', 'moderator'].includes(membership?.role);
   const pending = joinRequest?.status === 'pending';
   const declined = joinRequest?.status === 'declined';
-  const notices = [
-    {text: 'Your real profile is hidden here. A fresh alias is used for every post.'},
-    ...(joined ? [{text: 'Visit the queue to vote for what goes live.', onPress: () => navigation.navigate('CommunityQueue', {community})}] : []),
-  ];
-
   useEffect(() => {
     stickToLatestRef.current = true;
     setNextCursor(null);
   }, [id]);
-
-  useEffect(() => {
-    if (!noticeOpen || notices.length < 2) return undefined;
-    const timer = setInterval(() => setNoticeIndex(value => (value + 1) % notices.length), 5000);
-    return () => clearInterval(timer);
-  }, [noticeOpen, notices.length]);
 
   const showCommunityInfo = () => {
     Alert.alert(community.name, community.description || 'An anonymous space to speak freely and safely.', [
@@ -498,7 +475,7 @@ export default function CommunityHomeScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           onPress={() => navigation.goBack()}
-          style={styles.iconButton}>
+          style={styles.backButton}>
           <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
         </Pressable>
         <Pressable onPress={showCommunityInfo} onLongPress={showCommunityInfo} style={styles.headButton}>
@@ -507,6 +484,15 @@ export default function CommunityHomeScreen() {
           </Text>
         </Pressable>
         <View style={styles.actions}>
+          {joined ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Review queue"
+              onPress={() => navigation.navigate('CommunityQueue', {community})}
+              style={styles.iconButton}>
+              <Feather name="list" size={21} color={pastelColors.auth.deepText} />
+            </Pressable>
+          ) : null}
           {joined ? (
             <Pressable
               accessibilityRole="button"
@@ -523,21 +509,6 @@ export default function CommunityHomeScreen() {
           ) : null}
         </View>
       </View>
-
-      {noticeOpen && notices.length ? (
-        <Pressable
-          {...noticePan.panHandlers}
-          style={styles.noticeBar}
-          onPress={notices[noticeIndex]?.onPress}
-          onLongPress={() => setNoticeOpen(false)}
-          delayLongPress={450}
-          accessibilityLabel="Community information"
-          accessibilityHint="Swipe horizontally or long press to dismiss">
-          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.noticeText}>
-            {notices[noticeIndex]?.text}
-          </Text>
-        </Pressable>
-      ) : null}
 
       <FlatList
         ref={listRef}
@@ -713,20 +684,8 @@ const styles = StyleSheet.create({
   head: {flexShrink: 1, minWidth: 0, fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
   headButton: {flex: 1, minWidth: 0, paddingVertical: 8},
   iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
+  backButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -10},
   actions: {flexDirection: 'row', alignItems: 'center', gap: 2},
-  noticeBar: {
-    marginHorizontal: 16,
-    marginBottom: 4,
-    paddingHorizontal: 16,
-    minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: '#FFF0D9',
-    borderWidth: 1,
-    borderColor: '#F6D7A8',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  noticeText: {flex: 1, color: pastelColors.auth.deepText, fontWeight: '800', lineHeight: 18},
   headerAction: {
     position: 'relative',
     minHeight: 44,
