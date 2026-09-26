@@ -1,6 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -12,7 +11,7 @@ import {
 } from 'react-native';
 import {pastelColors} from '../../theme/colors';
 import {DOT, ELLIPSIS} from './communityUx';
-import {useKeyboardHeight} from './communityKeyboard';
+import {useKeyboardAwareScroll} from './communityKeyboard';
 
 type Props = {
   visible: boolean;
@@ -47,7 +46,14 @@ export default function CommunityJoinRequestSheet({
   const [revealUsername, setRevealUsername] = useState(false);
   const [alias, setAlias] = useState(suggestAlias());
   const [note, setNote] = useState('');
-  const keyboardHeight = useKeyboardHeight();
+  const {
+    KeyboardAvoidingView,
+    keyboardAvoidingProps,
+    scrollRef,
+    onInputFocus,
+    contentPadding,
+    scrollProps,
+  } = useKeyboardAwareScroll();
   const displayUsername = username.trim().replace(/^@/, '');
 
   useEffect(() => {
@@ -73,13 +79,13 @@ export default function CommunityJoinRequestSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.overlay} behavior="padding">
+      <KeyboardAvoidingView {...keyboardAvoidingProps} style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, {paddingBottom: 28 + keyboardHeight}]}>
+        <View style={styles.sheet}>
         <ScrollView
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets
+          ref={scrollRef}
+          {...scrollProps}
+          contentContainerStyle={contentPadding}
           bounces={false}>
           <Text style={styles.title}>Ask to join</Text>
           <Text style={styles.copy}>
@@ -103,6 +109,7 @@ export default function CommunityJoinRequestSheet({
               accessibilityLabel="Join request alias"
               value={alias}
               onChangeText={setAlias}
+              onFocus={onInputFocus}
               placeholder="Quiet Fox"
               placeholderTextColor={pastelColors.auth.mutedText}
               style={styles.input}
@@ -128,6 +135,7 @@ export default function CommunityJoinRequestSheet({
             accessibilityLabel="Join request note"
             value={note}
             onChangeText={setNote}
+            onFocus={onInputFocus}
             placeholder="Optional note to moderators"
             placeholderTextColor={pastelColors.auth.mutedText}
             multiline
