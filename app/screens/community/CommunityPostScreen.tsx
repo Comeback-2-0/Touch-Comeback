@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {RouteProp, useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {CommunityStackParamList, CommunitySummary} from '../../navigation/CommunityStack';
@@ -192,11 +193,15 @@ function VoteButton({
       }}
       style={styles.voteButton}>
       <Animated.View style={{transform: [{scale}]}}>
-        <Feather
-          name={icon}
-          size={24}
-          color={active ? pastelColors.accent : pastelColors.auth.mutedText}
-        />
+        {icon === 'thumbs-up' || icon === 'thumbs-down' ? (
+          <MaterialCommunityIcons
+            name={active ? icon === 'thumbs-up' ? 'thumb-up' : 'thumb-down' : icon === 'thumbs-up' ? 'thumb-up-outline' : 'thumb-down-outline'}
+            size={24}
+            color={active ? pastelColors.accent : pastelColors.auth.mutedText}
+          />
+        ) : (
+          <Feather name={icon} size={24} color={active ? pastelColors.accent : pastelColors.auth.mutedText} />
+        )}
       </Animated.View>
       <Text style={[styles.voteCount, active && styles.voteCountActive]}>{count}</Text>
     </Pressable>
@@ -361,18 +366,21 @@ export default function CommunityPostScreen() {
 
   const react = async (value: string) => {
     if (reacting) return;
-    const previous = post?.reactions?.myReaction;
+    const previous = post?.likedByMe ? 'like' : post?.dislikedByMe ? 'dislike' : '';
     const nextValue = previous === value ? '' : value;
     setReacting(true);
     setPost((current: any) => {
       if (!current) return current;
-      const totals = {...(current.reactions?.totals || {})};
-      if (previous) totals[previous] = Math.max(0, Number(totals[previous] || 0) - 1);
-      if (nextValue) totals[nextValue] = Number(totals[nextValue] || 0) + 1;
-      return {...current, reactions: {totals, myReaction: nextValue}};
+      return {
+        ...current,
+        likedByMe: nextValue === 'like',
+        dislikedByMe: nextValue === 'dislike',
+        likes: Math.max(0, Number(current.likes || 0) + (nextValue === 'like' ? 1 : 0) - (previous === 'like' ? 1 : 0)),
+        dislikes: Math.max(0, Number(current.dislikes || 0) + (nextValue === 'dislike' ? 1 : 0) - (previous === 'dislike' ? 1 : 0)),
+      };
     });
     try {
-      const response = await api.post(`${base}/react`, {value});
+      const response = await api.post(`${base}/${value}`);
       if (response.data.post) applyPost(response.data.post);
     } catch (err) {
       await load();
@@ -502,7 +510,7 @@ export default function CommunityPostScreen() {
     }
   };
 
-  const selectedReaction = post?.reactions?.myReaction;
+  const selectedReaction = post?.likedByMe ? 'like' : post?.dislikedByMe ? 'dislike' : '';
 
   if (loading) {
     return (
@@ -604,7 +612,7 @@ export default function CommunityPostScreen() {
           <View style={styles.reactions}>
             {reactionOptions.map(option => {
               const selected = selectedReaction === option.value;
-              const count = post.reactions?.totals?.[option.value] || 0;
+              const count = option.value === 'like' ? Number(post.likes || 0) : Number(post.dislikes || 0);
               return (
                 <VoteButton
                   key={option.value}
