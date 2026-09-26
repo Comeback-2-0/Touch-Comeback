@@ -34,6 +34,7 @@ type Props = {
   showAvatar?: boolean;
   showAnonymousLabel?: boolean;
   onDoubleTapLike?: () => void;
+  onMorePress?: () => void;
 };
 
 function isVideo(media?: Media | null) {
@@ -56,6 +57,7 @@ export default function CommunityPostCard({
   showAvatar = !queueStyle,
   showAnonymousLabel = !queueStyle,
   onDoubleTapLike,
+  onMorePress,
 }: Props) {
   const uri = media?.url || media?.uri;
   const hasMedia = Boolean(uri);
@@ -142,6 +144,11 @@ export default function CommunityPostCard({
             ) : null}
           </View>
           {state ? <Text style={styles.state}>{state}</Text> : null}
+          {onMorePress ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Post options" onPress={onMorePress} style={styles.moreButton}>
+              <Feather name="more-vertical" size={19} color={pastelColors.auth.deepText} />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
       {hasMedia ? (
@@ -154,7 +161,13 @@ export default function CommunityPostCard({
         )
       ) : null}
       {hasText ? (
-        <Text style={[styles.caption, !hasMedia && styles.textOnly]}>{caption.trim()}</Text>
+        onDoubleTapLike ? (
+          <Pressable onPress={handleMediaPress} accessibilityRole="text">
+            <Text style={[styles.caption, !hasMedia && styles.textOnly]}>{caption.trim()}</Text>
+          </Pressable>
+        ) : (
+          <Text style={[styles.caption, !hasMedia && styles.textOnly]}>{caption.trim()}</Text>
+        )
       ) : null}
       {link ? (
         <Pressable
@@ -216,6 +229,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
+  moreButton: {height: 40, width: 34, alignItems: 'center', justifyContent: 'center'},
   mediaFrame: {
     width: '100%',
     alignSelf: 'stretch',

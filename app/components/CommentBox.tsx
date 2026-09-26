@@ -26,6 +26,7 @@ const CommentBox: React.FC<Props> = ({onSubmit, placeholder = 'Write a comment'}
         onChangeText={setText}
         style={styles.input}
         multiline
+        scrollEnabled
       />
       <Pressable
         accessibilityRole="button"

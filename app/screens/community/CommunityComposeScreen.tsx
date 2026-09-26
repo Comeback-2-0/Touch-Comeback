@@ -252,6 +252,7 @@ export default function CommunityComposeScreen() {
             onChangeText={setText}
             onFocus={onInputFocus}
             multiline
+            scrollEnabled
             placeholder={placeholder}
             placeholderTextColor={pastelColors.auth.mutedText}
             style={[styles.text, !media && styles.textOnly]}
@@ -379,7 +380,8 @@ const styles = StyleSheet.create({
   addHint: {color: pastelColors.auth.mutedText, fontWeight: '600', fontSize: 12},
   text: {
     marginTop: 12,
-    minHeight: 88,
+    height: 112,
+    maxHeight: 112,
     padding: 14,
     borderRadius: 12,
     backgroundColor: pastelColors.white,
@@ -387,7 +389,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     textAlignVertical: 'top',
   },
-  textOnly: {minHeight: 160, fontSize: 18, lineHeight: 26, fontWeight: '600'},
+  textOnly: {height: 160, maxHeight: 160, fontSize: 18, lineHeight: 26, fontWeight: '600'},
   loading: {marginTop: 16},
   bottomCta: {
     marginTop: 22,

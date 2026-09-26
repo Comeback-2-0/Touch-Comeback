@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Alert,
   FlatList,
@@ -27,6 +27,7 @@ import {
   joinModeLabel,
   leaveConsequenceCopy,
   membersCopy,
+  formatRelativeTime,
   showCommunityToast,
   splitRules,
   visibilityLabel,
@@ -47,6 +48,13 @@ type Post = {
   pinned?: boolean;
   publishedAt?: string;
   createdAt?: string;
+  upvotes?: number;
+  downvotes?: number;
+  likes?: number;
+  dislikes?: number;
+  likedByMe?: boolean;
+  dislikedByMe?: boolean;
+  reactions?: {totals?: {like?: number}};
 };
 
 const FEED_PAGE_SIZE = 20;
@@ -87,10 +95,9 @@ export default function CommunityHomeScreen() {
   const {params} = useRoute<Route>();
   const routeCommunity = params.community;
   const id = routeCommunity?.id || routeCommunity?._id || params.communityId || '';
-  const username =
-    useAuthStore(state => state.profile?.username) ||
-    useAuthStore(state => state.user?.username) ||
-    '';
+  const profileUsername = useAuthStore(state => state.profile?.username);
+  const userUsername = useAuthStore(state => state.user?.username);
+  const username = profileUsername || userUsername || '';
 
   const [community, setCommunity] = useState<any>(routeCommunity || {id, name: 'Community'});
   const [posts, setPosts] = useState<Post[]>([]);
@@ -107,10 +114,11 @@ export default function CommunityHomeScreen() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [rulesExpanded, setRulesExpanded] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(true);
+  const [noticeIndex, setNoticeIndex] = useState(0);
   const blockCommunity = useBlockedCommunitiesStore(state => state.block);
   const listRef = useRef<FlatList<Post>>(null);
   const stickToLatestRef = useRef(true);
@@ -120,15 +128,28 @@ export default function CommunityHomeScreen() {
   const manager = ['owner', 'moderator'].includes(membership?.role);
   const pending = joinRequest?.status === 'pending';
   const declined = joinRequest?.status === 'declined';
-  const visibleRules = useMemo(
-    () => splitRules(community?.rules, rulesExpanded ? 12 : 3),
-    [community?.rules, rulesExpanded],
-  );
+  const notices = [
+    {text: 'Your real profile is hidden here. A fresh alias is used for every post.'},
+    ...(joined ? [{text: 'Visit the queue to vote for what goes live.', onPress: () => navigation.navigate('CommunityQueue', {community})}] : []),
+  ];
 
   useEffect(() => {
     stickToLatestRef.current = true;
     setNextCursor(null);
   }, [id]);
+
+  useEffect(() => {
+    if (!noticeOpen || notices.length < 2) return undefined;
+    const timer = setInterval(() => setNoticeIndex(value => (value + 1) % notices.length), 5000);
+    return () => clearInterval(timer);
+  }, [noticeOpen, notices.length]);
+
+  const showCommunityInfo = () => {
+    Alert.alert(community.name, community.description || 'An anonymous space to speak freely and safely.', [
+      ...(String(community.rules || '').trim() ? [{text: `Rules: ${splitRules(community.rules, 12).join(' • ')}`, style: 'default' as const}] : []),
+      {text: 'Close', style: 'cancel'},
+    ]);
+  };
 
   const scrollToLatest = useCallback((animated = false) => {
     if (!posts.length) return;
@@ -315,6 +336,16 @@ export default function CommunityHomeScreen() {
     }
   };
 
+  const engagePost = async (postId: string, action: 'like' | 'dislike') => {
+    try {
+      const response = await api.post(`/communities/${id}/content/${postId}/${action}`);
+      const next = response.data?.post;
+      if (next) setPosts(current => current.map(item => item.id === postId ? {...item, ...next} : item));
+    } catch {
+      showCommunityToast('Could not update reaction.');
+    }
+  };
+
   const primaryJoinLabel = () => {
     if (community?.joinMode === 'approval') return 'Request to join';
     if (community?.joinMode === 'invite-only') return 'Enter invite code';
@@ -436,7 +467,7 @@ export default function CommunityHomeScreen() {
             <Text style={styles.copy}>
               Join to see posts, rules, and queue activity.
             </Text>
-            {statusBlock()}
+            {!joined ? statusBlock() : null}
           </View>
         </View>
         <CommunityJoinRequestSheet
@@ -460,66 +491,12 @@ export default function CommunityHomeScreen() {
           style={styles.iconButton}>
           <Feather name="arrow-left" size={22} color={pastelColors.auth.deepText} />
         </Pressable>
-        <Text numberOfLines={1} style={[styles.head, {flex: 1}]}>
+        <Pressable onPress={showCommunityInfo} onLongPress={showCommunityInfo} style={styles.headButton}>
+          <Text numberOfLines={1} style={[styles.head, {flex: 1}]}>
           {community.name}
-        </Text>
+          </Text>
+        </Pressable>
         <View style={styles.actions}>
-          {joined ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={muted ? 'Unmute community' : 'Mute community'}
-              onPress={async () => {
-                try {
-                  const nextMuted = !muted;
-                  await api.put(`/communities/${id}/mute`, {muted: nextMuted});
-                  setMuted(nextMuted);
-                  showCommunityToast(nextMuted ? 'Community muted.' : 'Notifications on.');
-                } catch {
-                  Alert.alert('Could not update notifications', 'Please try again.');
-                }
-              }}
-              style={styles.iconButton}>
-              <Feather
-                name={muted ? 'bell-off' : 'bell'}
-                size={20}
-                color={pastelColors.auth.deepText}
-              />
-            </Pressable>
-          ) : null}
-          {manager ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Manage community"
-              onPress={() => navigation.navigate('CommunityManage', {community})}
-              style={styles.headerAction}>
-              <Feather name="settings" size={20} color={pastelColors.auth.deepText} />
-              <Text style={styles.headerActionText}>Manage</Text>
-              {pendingCount > 0 ? (
-                <View style={styles.badgeDot}>
-                  <Text style={styles.badgeText}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          ) : null}
-          {joined ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Community options"
-              onPress={() => setOptionsOpen(true)}
-              style={styles.iconButton}>
-              <Feather name="more-horizontal" size={20} color={pastelColors.auth.deepText} />
-            </Pressable>
-          ) : null}
-          {joined ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Review queue. Queue is where members vote before posts go live."
-              onPress={() => navigation.navigate('CommunityQueue', {community})}
-              style={styles.headerAction}>
-              <Feather name="list" size={20} color={pastelColors.auth.deepText} />
-              <Text style={styles.headerActionText}>Queue</Text>
-            </Pressable>
-          ) : null}
           {joined ? (
             <Pressable
               accessibilityRole="button"
@@ -527,11 +504,25 @@ export default function CommunityHomeScreen() {
               onPress={() => navigation.navigate('CommunityCompose', {community})}
               style={styles.headerAction}>
               <Feather name="plus-square" size={21} color={pastelColors.auth.deepText} />
-              <Text style={styles.headerActionText}>Post</Text>
+            </Pressable>
+          ) : null}
+          {joined ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Community options" onPress={() => setOptionsOpen(true)} style={styles.iconButton}>
+              <Feather name="more-vertical" size={22} color={pastelColors.auth.deepText} />
             </Pressable>
           ) : null}
         </View>
       </View>
+
+      {noticeOpen && notices.length ? (
+        <Pressable style={styles.noticeBar} onPress={notices[noticeIndex]?.onPress}>
+          <Feather name="shield" size={16} color={pastelColors.accent} />
+          <Text style={styles.noticeText}>{notices[noticeIndex]?.text}</Text>
+          <Pressable onPress={() => setNoticeOpen(false)} accessibilityLabel="Close information" style={styles.noticeClose}>
+            <Feather name="x" size={16} color={pastelColors.auth.mutedText} />
+          </Pressable>
+        </Pressable>
+      ) : null}
 
       <FlatList
         ref={listRef}
@@ -565,51 +556,6 @@ export default function CommunityHomeScreen() {
                 <Text style={styles.loadOlderText}>Load earlier posts</Text>
               </Pressable>
             ) : null}
-            {hero}
-            {joined ? (
-              <View style={styles.privacyNote}>
-                <Feather name="shield" size={17} color={pastelColors.accent} />
-                <Text style={styles.privacyNoteText}>
-                  Your real profile is hidden here. A fresh alias is used for every post.
-                </Text>
-              </View>
-            ) : null}
-            {visibleRules.length && joined ? (
-              <View style={styles.rulesBox}>
-                <Text style={styles.rulesTitle}>Before you post here</Text>
-                {visibleRules.map(rule => (
-                  <Text key={rule} style={styles.ruleBullet}>
-                    {`- ${rule}`}
-                  </Text>
-                ))}
-                {String(community.rules || '').length > 80 ? (
-                  <Pressable onPress={() => setRulesExpanded(value => !value)}>
-                    <Text style={styles.rulesMore}>
-                      {rulesExpanded ? 'Show fewer rules' : 'View all rules'}
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : null}
-            {statusBlock()}
-            <View style={styles.sectionHead}>
-              <View>
-                <Text style={styles.sectionTitle}>Published feed</Text>
-                <Text style={styles.sectionCopy}>Published by community vote</Text>
-              </View>
-              {joined ? (
-                <Pressable onPress={() => navigation.navigate('CommunityQueue', {community})}>
-                  <Text style={styles.sectionLink}>
-                    Review queue{queueCount ? ` (${queueCount})` : ''}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-            {joined ? (
-              <Text style={styles.queueHint}>
-                Queue is where members vote before posts go live.
-              </Text>
-            ) : null}
           </View>
         }
         renderItem={({item}) => (
@@ -622,16 +568,30 @@ export default function CommunityHomeScreen() {
               caption={item.text}
               media={item.media}
               link={item.link}
-              state={item.pinned ? 'Pinned' : 'Published'}
+              timeLabel={item.createdAt ? formatRelativeTime(item.createdAt) : undefined}
+              showAvatar={false}
+              showAnonymousLabel={false}
+              onDoubleTapLike={() => engagePost(item.id, 'like')}
+              onMorePress={() => Alert.alert('Post options', 'What would you like to do?', [
+                {text: 'Cancel', style: 'cancel'},
+                {text: 'Report post', style: 'destructive', onPress: () => api.post(`/communities/${id}/content/${item.id}/report`, {reason: 'other'})},
+              ])}
             />
             <View style={styles.feedActions}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Like post" onPress={() => engagePost(item.id, 'like')} style={styles.feedAction}>
+                <Feather name="thumbs-up" size={17} color={item.likedByMe ? pastelColors.accent : pastelColors.auth.deepText} />
+                <Text style={styles.feedActionText}>{Number(item.likes || 0)}</Text>
+                </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Dislike post" onPress={() => engagePost(item.id, 'dislike')} style={styles.feedAction}>
+                <Feather name="thumbs-down" size={17} color={item.dislikedByMe ? pastelColors.accent : pastelColors.auth.deepText} />
+                <Text style={styles.feedActionText}>{Number(item.dislikes || 0)}</Text>
+              </Pressable>
               <View style={styles.feedAction}>
                 <Feather name="message-circle" size={20} color={pastelColors.auth.deepText} />
                 <Text style={styles.feedActionText}>
                   {Number(item.commentsCount ?? countThreadComments(item.comments as any))}
                 </Text>
               </View>
-              <Text style={styles.feedMeta}>Published</Text>
             </View>
           </Pressable>
         )}
@@ -665,6 +625,18 @@ export default function CommunityHomeScreen() {
           <Pressable style={styles.optionsBackdrop} onPress={() => setOptionsOpen(false)} />
           <View style={styles.optionsSheet}>
             <Text style={styles.optionsTitle}>Community options</Text>
+            {manager ? (
+              <Pressable onPress={() => { setOptionsOpen(false); navigation.navigate('CommunityManage', {community}); }} style={styles.optionsRow}>
+                <Feather name="settings" size={18} color={pastelColors.auth.deepText} />
+                <Text style={styles.optionsRowText}>Manage community{pendingCount ? ` (${pendingCount} pending)` : ''}</Text>
+              </Pressable>
+            ) : null}
+            {joined ? (
+              <Pressable onPress={() => { setOptionsOpen(false); navigation.navigate('CommunityQueue', {community}); }} style={styles.optionsRow}>
+                <Feather name="list" size={18} color={pastelColors.auth.deepText} />
+                <Text style={styles.optionsRowText}>Open voting queue{queueCount ? ` (${queueCount})` : ''}</Text>
+              </Pressable>
+            ) : null}
             <Pressable onPress={toggleMute} style={styles.optionsRow}>
               <Feather name={muted ? 'bell-off' : 'bell'} size={18} color={pastelColors.auth.deepText} />
               <Text style={styles.optionsRowText}>
@@ -724,8 +696,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   head: {flexShrink: 1, minWidth: 0, fontSize: 18, fontWeight: '900', color: pastelColors.auth.deepText},
+  headButton: {flex: 1, minWidth: 0, paddingVertical: 8},
   iconButton: {height: 44, width: 44, alignItems: 'center', justifyContent: 'center'},
   actions: {flexDirection: 'row', alignItems: 'center', gap: 2},
+  noticeBar: {
+    marginHorizontal: 16,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: pastelColors.auth.glassSurface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  noticeText: {flex: 1, color: pastelColors.auth.mutedText, fontWeight: '700', lineHeight: 18},
+  noticeClose: {height: 36, width: 30, alignItems: 'center', justifyContent: 'center'},
   headerAction: {
     position: 'relative',
     minHeight: 44,

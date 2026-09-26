@@ -135,6 +135,7 @@ export default function CreatePostScreen({navigation, route}: Props) {
                 placeholder="Write a caption..."
                 placeholderTextColor={pastelColors.auth.mutedText}
                 multiline
+                scrollEnabled
                 textAlignVertical="center"
                 editable={!createMutation.isPending}
                 style={styles.captionInput}
@@ -253,8 +254,9 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   captionInput: {
+    height: 112,
+    maxHeight: 112,
     minHeight: 44,
-    maxHeight: 116,
     paddingHorizontal: 0,
     paddingVertical: 8,
     color: pastelColors.auth.deepText,

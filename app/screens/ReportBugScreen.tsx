@@ -118,6 +118,7 @@ export default function ReportBugScreen() {
             placeholder="Tell us what broke"
             placeholderTextColor="#A98C98"
             multiline
+            scrollEnabled
             style={[styles.input, styles.shortTextArea]}
           />
 
@@ -129,6 +130,7 @@ export default function ReportBugScreen() {
             placeholder="List the taps or screen path"
             placeholderTextColor="#A98C98"
             multiline
+            scrollEnabled
             style={styles.input}
           />
 

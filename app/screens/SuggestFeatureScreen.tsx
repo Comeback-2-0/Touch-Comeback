@@ -83,6 +83,7 @@ export default function SuggestFeatureScreen() {
             placeholder="Allow community owners to create polls."
             placeholderTextColor="#A98C98"
             multiline
+            scrollEnabled
             style={styles.textArea}
           />
 
@@ -162,7 +163,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   textArea: {
-    minHeight: 150,
+    height: 150,
+    maxHeight: 150,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: pastelColors.auth.glassBorder,

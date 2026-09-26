@@ -183,7 +183,8 @@ export default function ProfileForm({
               onChangeText={value => setBio(value.slice(0, BIO_LIMIT))}
               placeholder="Optional"
               placeholderTextColor={pastelColors.auth.mutedText}
-              multiline
+                multiline
+                scrollEnabled
               textAlignVertical="top"
               style={[styles.input, styles.bioInput]}
             />

@@ -131,6 +131,7 @@ export default function CommunityJoinRequestSheet({
             placeholder="Optional note to moderators"
             placeholderTextColor={pastelColors.auth.mutedText}
             multiline
+            scrollEnabled
             style={[styles.input, styles.noteInput]}
           />
 
@@ -219,7 +220,7 @@ const styles = StyleSheet.create({
     color: pastelColors.auth.deepText,
     fontWeight: '700',
   },
-  noteInput: {minHeight: 78, textAlignVertical: 'top'},
+  noteInput: {height: 96, maxHeight: 96, textAlignVertical: 'top'},
   preview: {
     marginTop: 10,
     padding: 12,

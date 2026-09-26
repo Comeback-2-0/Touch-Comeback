@@ -468,6 +468,7 @@ function PublicPostCard({post, compact = false, onCommentPress}: Props) {
                 placeholder="Add details, optional"
                 placeholderTextColor={pastelColors.auth.mutedText}
                 multiline
+                scrollEnabled
               maxLength={500}
                 style={styles.reportDetailsInput}
               />
@@ -634,7 +635,8 @@ function PublicPostCard({post, compact = false, onCommentPress}: Props) {
               onChangeText={setCommentDraft}
               placeholder="Write a comment"
               placeholderTextColor={pastelColors.auth.mutedText}
-              multiline
+                multiline
+                scrollEnabled
               style={styles.reportDetailsInput}
             />
             <Pressable
@@ -858,6 +860,8 @@ const styles = StyleSheet.create({
     color: pastelColors.accent,
   },
   reportDetailsInput: {
+    height: 96,
+    maxHeight: 96,
     minHeight: 64,
     marginTop: 12,
     paddingHorizontal: 10,

@@ -788,6 +788,7 @@ export default function CommunityManageScreen() {
           placeholder="What is this space for?"
           placeholderTextColor={pastelColors.auth.mutedText}
           multiline
+          scrollEnabled
         />
 
         <Text style={styles.label}>Rules</Text>
@@ -800,6 +801,7 @@ export default function CommunityManageScreen() {
           placeholder="What should members know?"
           placeholderTextColor={pastelColors.auth.mutedText}
           multiline
+          scrollEnabled
         />
 
         <Text style={styles.label}>Visibility</Text>
@@ -1686,7 +1688,7 @@ const styles = StyleSheet.create({
     color: pastelColors.auth.deepText,
     fontWeight: '700',
   },
-  largeInput: {minHeight: 88, textAlignVertical: 'top'},
+  largeInput: {height: 112, maxHeight: 112, textAlignVertical: 'top'},
   imagePicker: {
     alignSelf: 'center',
     width: 116,

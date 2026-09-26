@@ -260,6 +260,7 @@ export default function CommunityCreateScreen() {
                 placeholderTextColor={pastelColors.auth.mutedText}
                 style={[styles.input, styles.multiline]}
                 multiline
+                scrollEnabled
               />
               <Text style={styles.helper}>One sentence on the mood of this corner.</Text>
             </View>
@@ -312,6 +313,7 @@ export default function CommunityCreateScreen() {
               placeholderTextColor={pastelColors.auth.mutedText}
               style={[styles.input, styles.multiline]}
               multiline
+              scrollEnabled
             />
             <Text style={styles.helper}>
               Members will see this under "Before you post here."
@@ -392,7 +394,7 @@ const styles = StyleSheet.create({
     color: pastelColors.auth.deepText,
     fontWeight: '700',
   },
-  multiline: {minHeight: 88, textAlignVertical: 'top'},
+  multiline: {height: 112, maxHeight: 112, textAlignVertical: 'top'},
   option: {
     marginTop: 10,
     padding: 13,

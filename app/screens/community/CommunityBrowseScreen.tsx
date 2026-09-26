@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   AccessibilityInfo,
+  Alert,
   Animated,
   FlatList,
   Image,
@@ -343,7 +344,13 @@ export default function CommunityBrowseScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${item.name}`}
                 delayLongPress={280}
-                onLongPress={() => setPreviewId(id)}
+                onLongPress={() => {
+                  setPreviewId(id);
+                  Alert.alert(item.name, item.description?.trim() || 'An anonymous place to connect.', [
+                    {text: 'Close', style: 'cancel'},
+                    {text: 'Open community', onPress: () => navigation.navigate('CommunityHome', {community: item})},
+                  ]);
+                }}
                 onPress={() => {
                   setPreviewId(null);
                   navigation.navigate('CommunityHome', {community: item});

@@ -832,6 +832,7 @@ export default function CommunityPostScreen() {
               placeholderTextColor={pastelColors.auth.mutedText}
               style={styles.input}
               multiline
+              scrollEnabled
               maxLength={MAX_COMMENT_TEXT}
               maxFontSizeMultiplier={1.4}
             />
@@ -895,6 +896,7 @@ export default function CommunityPostScreen() {
               placeholder="Optional context"
               placeholderTextColor={pastelColors.auth.mutedText}
               multiline
+              scrollEnabled
               style={styles.reportInput}
             />
             <View style={styles.reportActions}>
@@ -1019,6 +1021,8 @@ const styles = StyleSheet.create({
   reasonText: {fontWeight: '800', color: pastelColors.auth.deepText},
   reasonTextActive: {color: pastelColors.white},
   reportInput: {
+    height: 96,
+    maxHeight: 96,
     marginTop: 12,
     minHeight: 80,
     padding: 12,
